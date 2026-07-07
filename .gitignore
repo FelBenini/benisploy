@@ -1,0 +1,35 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Node / Bun
+node_modules/
+dist/
+.build/
+*.tsbuildinfo
+*.tsbuildinfo.*
+.env
+.env.*
+!.env.example
+
+# Go
+/go/
+*.exe
+*.exe~
+*.test
+*.out
+*.o
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Logs
+*.log
+
+# Temp
+.tmp/
+tmp/
