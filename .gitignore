@@ -6,6 +6,7 @@ Thumbs.db
 node_modules/
 dist/
 .build/
+.svelte-kit/
 *.tsbuildinfo
 *.tsbuildinfo.*
 .env
@@ -33,3 +34,6 @@ dist/
 # Temp
 .tmp/
 tmp/
+
+# Build output
+build/
