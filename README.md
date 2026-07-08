@@ -11,3 +11,20 @@
 - [Architecture Document](docs/ARCHITECTURE.md)
 - [Contributing Guide](CONTRIBUTING.md)
 - [Code of Conduct](CODE_OF_CONDUCT.md)
+
+## Monorepo Structure
+
+```
+/apps
+  /web                       # SvelteKit + TS + Bun — dashboard UI and control-plane API, one deployable
+  /node-agent                 # Go module — installed on each managed VPS
+/packages
+  /agent-protocol              # shared JSON/Zod schemas for control-plane <-> node-agent WS protocol
+  /tool-schemas                 # JSON schema for orchestrator tools (source of truth for AI agent)
+/templates                    # curated app catalog (future)
+/deploy                       # compose file / install script (future)
+/docs
+/scripts
+```
+
+See [ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full design document.

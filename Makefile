@@ -13,7 +13,10 @@ setup:
 	@echo "Make sure Docker is running for Postgres."
 
 dev:
-	@cd apps/web && bun run dev
+	@trap 'kill 0' EXIT; \
+	cd apps/web && bun run dev & \
+	cd apps/node-agent && go run ./cmd/agent & \
+	wait
 
 test:
 	@cd apps/web && bun run test
