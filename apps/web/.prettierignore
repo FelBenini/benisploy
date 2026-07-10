@@ -1,0 +1,6 @@
+# SvelteKit build and internal directories
+.svelte-kit/
+build/
+
+# Dependency directories
+node_modules/
