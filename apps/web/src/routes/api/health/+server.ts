@@ -1,10 +1,10 @@
-import { json } from '@sveltejs/kit';
-import type { RequestHandler } from './$types';
+import { json } from "@sveltejs/kit";
+import type { RequestHandler } from "./$types";
 
 // Cache the health check result for 5 seconds to reduce DB load
 let lastHealthCheck = {
   timestamp: 0,
-  healthy: false
+  healthy: false,
 };
 
 const HEALTH_CHECK_CACHE_TTL = 5000; // 5 seconds
@@ -19,27 +19,27 @@ export const GET: RequestHandler = async () => {
         return healthyResponse();
       }
 
-      return unhealthyResponse('Service degraded');
+      return unhealthyResponse("Service degraded");
     }
 
     await checkDatabaseHealth();
 
     lastHealthCheck = {
       timestamp: now,
-      healthy: true
+      healthy: true,
     };
 
     return healthyResponse();
   } catch (error) {
     lastHealthCheck = {
       timestamp: Date.now(),
-      healthy: false
+      healthy: false,
     };
 
     const message =
-      error instanceof Error ? error.message : 'Unknown error occurred';
+      error instanceof Error ? error.message : "Unknown error occurred";
 
-    console.error('[Health Check] Error:', message);
+    console.error("[Health Check] Error:", message);
 
     return unhealthyResponse(message);
   }
@@ -60,23 +60,23 @@ async function checkDatabaseHealth(): Promise<void> {
 function healthyResponse() {
   return json(
     {
-      status: 'ok',
+      status: "ok",
       timestamp: new Date().toISOString(),
       uptime: process.uptime(),
-      environment: process.env.NODE_ENV ?? 'development',
-      version: process.env.npm_package_version ?? '0.1.0'
+      environment: process.env.NODE_ENV ?? "development",
+      version: process.env.npm_package_version ?? "0.1.0",
     },
-    { status: 200 }
+    { status: 200 },
   );
 }
 
 function unhealthyResponse(error: string) {
   return json(
     {
-      status: 'error',
+      status: "error",
       message: error,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     },
-    { status: 503 }
+    { status: 503 },
   );
 }
