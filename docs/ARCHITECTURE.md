@@ -159,7 +159,6 @@ Control plane ↔ node agent: WebSocket + JSON, validated against shared Zod sch
     /node-agent                 # Go module — installed on each managed VPS
   /packages
     /agent-protocol              # shared JSON/Zod schemas for the control-plane <-> node-agent WebSocket protocol
-    /tool-schemas                 # JSON schema for orchestrator tools
   /templates                    # curated app catalog: compose specs + metadata
   /deploy                       # compose file / install script
   /docs
