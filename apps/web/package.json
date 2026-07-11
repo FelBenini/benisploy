@@ -9,7 +9,7 @@
     "test": "vitest run",
     "lint": "prettier --check . && eslint .",
     "format": "prettier --write .",
-    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json && tsc -p tsconfig.json --noEmit",
+    "check": "cp -n .env.example .env 2>/dev/null; svelte-kit sync && svelte-check --tsconfig ./tsconfig.json && tsc -p tsconfig.json --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:studio": "drizzle-kit studio"
@@ -35,6 +35,7 @@
   },
   "type": "module",
   "dependencies": {
+    "@types/pg": "^8.20.0",
     "drizzle-kit": "^0.31.10",
     "drizzle-orm": "^0.45.2",
     "pg": "^8.22.0",
