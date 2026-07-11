@@ -154,12 +154,8 @@
           "name": "apps_orgId_orgs_id_fk",
           "tableFrom": "apps",
           "tableTo": "orgs",
-          "columnsFrom": [
-            "orgId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["orgId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -167,12 +163,8 @@
           "name": "apps_serverId_servers_id_fk",
           "tableFrom": "apps",
           "tableTo": "servers",
-          "columnsFrom": [
-            "serverId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["serverId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -349,12 +341,8 @@
           "name": "audit_log_orgId_orgs_id_fk",
           "tableFrom": "audit_log",
           "tableTo": "orgs",
-          "columnsFrom": [
-            "orgId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["orgId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -362,12 +350,8 @@
           "name": "audit_log_actorId_users_id_fk",
           "tableFrom": "audit_log",
           "tableTo": "users",
-          "columnsFrom": [
-            "actorId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["actorId"],
+          "columnsTo": ["id"],
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -513,12 +497,8 @@
           "name": "deployments_appId_apps_id_fk",
           "tableFrom": "deployments",
           "tableTo": "apps",
-          "columnsFrom": [
-            "appId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["appId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -621,12 +601,8 @@
           "name": "env_vars_orgId_orgs_id_fk",
           "tableFrom": "env_vars",
           "tableTo": "orgs",
-          "columnsFrom": [
-            "orgId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["orgId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -634,12 +610,8 @@
           "name": "env_vars_appId_apps_id_fk",
           "tableFrom": "env_vars",
           "tableTo": "apps",
-          "columnsFrom": [
-            "appId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["appId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -739,12 +711,8 @@
           "name": "memberships_userId_users_id_fk",
           "tableFrom": "memberships",
           "tableTo": "users",
-          "columnsFrom": [
-            "userId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["userId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -752,12 +720,8 @@
           "name": "memberships_orgId_orgs_id_fk",
           "tableFrom": "memberships",
           "tableTo": "orgs",
-          "columnsFrom": [
-            "orgId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["orgId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -843,9 +807,7 @@
         "orgs_slug_unique": {
           "name": "orgs_slug_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "slug"
-          ]
+          "columns": ["slug"]
         }
       },
       "policies": {},
@@ -991,12 +953,8 @@
           "name": "servers_orgId_orgs_id_fk",
           "tableFrom": "servers",
           "tableTo": "orgs",
-          "columnsFrom": [
-            "orgId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["orgId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1067,9 +1025,7 @@
         "users_email_unique": {
           "name": "users_email_unique",
           "nullsNotDistinct": false,
-          "columns": [
-            "email"
-          ]
+          "columns": ["email"]
         }
       },
       "policies": {},

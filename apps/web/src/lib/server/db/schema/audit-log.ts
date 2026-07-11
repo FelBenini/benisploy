@@ -1,10 +1,4 @@
-import {
-  pgTable,
-  text,
-  timestamp,
-  jsonb,
-  index,
-} from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, jsonb, index } from "drizzle-orm/pg-core";
 import { orgs } from "./orgs";
 import { users } from "./users";
 

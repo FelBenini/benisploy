@@ -1,9 +1,4 @@
-import {
-  pgTable,
-  text,
-  timestamp,
-  index,
-} from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, index } from "drizzle-orm/pg-core";
 import { orgs } from "./orgs";
 import { servers } from "./servers";
 
