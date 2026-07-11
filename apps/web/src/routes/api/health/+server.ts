@@ -46,15 +46,8 @@ export const GET: RequestHandler = async () => {
 };
 
 async function checkDatabaseHealth(): Promise<void> {
-  // try {
-  //   // Replace with your database query
-  //   await db.execute('SELECT 1');
-  // } catch (error) {
-  //   throw new Error(
-  //     `Database check failed: ${error instanceof Error ? error.message : 'Unknown error'
-  //     }`
-  //   );
-  // }
+  const { checkDbConnection } = await import("$lib/server/db/client");
+  await checkDbConnection();
 }
 
 function healthyResponse() {
