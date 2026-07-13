@@ -1,3 +1,4 @@
+export * from "./app";
 export * from "./app-spec";
 export * from "./server";
 export * from "./deployment";
