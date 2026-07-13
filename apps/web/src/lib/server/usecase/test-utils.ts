@@ -2,11 +2,7 @@ import type { Repository } from "../ports/repository";
 import type { NodeAgentClient, LogEntry } from "../ports/node-agent-client";
 import type { App } from "../domain/app";
 import type { Deployment } from "../domain/deployment";
-import type {
-  Server,
-  CreateServerInput,
-  ServerStatusReport,
-} from "../domain/server";
+import type { Server, ServerStatusReport } from "../domain/server";
 import type { User } from "../domain/user";
 import type { AppSpec } from "../domain/app-spec";
 
