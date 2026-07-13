@@ -4,10 +4,12 @@ import type {
   AppRepository,
   DeploymentRepository,
   UserRepository,
+  SessionRepository,
 } from "../ports/repository";
 import type { NodeAgentClient, LogEntry } from "../ports/node-agent-client";
 import type { App } from "../domain/app";
 import type { Deployment } from "../domain/deployment";
+import type { Session } from "../domain/session";
 import type { Server, ServerStatusReport } from "../domain/server";
 import type { User } from "../domain/user";
 import type { AppSpec } from "../domain/app-spec";
@@ -156,17 +158,45 @@ class InMemoryUserRepo implements UserRepository {
   }
 }
 
+class InMemorySessionRepo implements SessionRepository {
+  items = new Map<string, Session>();
+
+  async create(session: Session): Promise<Session> {
+    this.items.set(session.id, { ...session });
+    return session;
+  }
+
+  async get(id: string): Promise<Session | null> {
+    const entry = this.items.get(id);
+    return entry ? { ...entry } : null;
+  }
+
+  async delete(id: string): Promise<void> {
+    this.items.delete(id);
+  }
+
+  async deleteAllForUser(userId: string): Promise<void> {
+    for (const [id, session] of this.items) {
+      if (session.userId === userId) {
+        this.items.delete(id);
+      }
+    }
+  }
+}
+
 export class InMemoryRepository implements Repository {
   servers: InMemoryServerRepo;
   apps: InMemoryAppRepo;
   deployments: InMemoryDeploymentRepo;
   users: InMemoryUserRepo;
+  sessions: InMemorySessionRepo;
 
   constructor() {
     this.apps = new InMemoryAppRepo();
     this.servers = new InMemoryServerRepo();
     this.deployments = new InMemoryDeploymentRepo(this.apps);
     this.users = new InMemoryUserRepo();
+    this.sessions = new InMemorySessionRepo();
   }
 }
 

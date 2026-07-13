@@ -1,5 +1,6 @@
 import type { App } from "../domain/app";
 import type { Deployment } from "../domain/deployment";
+import type { Session } from "../domain/session";
 import type { Server, CreateServerInput } from "../domain/server";
 import type { User } from "../domain/user";
 
@@ -39,9 +40,17 @@ export interface UserRepository {
   getByEmail(orgId: string, email: string): Promise<User | null>;
 }
 
+export interface SessionRepository {
+  create(session: Session): Promise<Session>;
+  get(id: string): Promise<Session | null>;
+  delete(id: string): Promise<void>;
+  deleteAllForUser(userId: string): Promise<void>;
+}
+
 export interface Repository {
   servers: ServerRepository;
   apps: AppRepository;
   deployments: DeploymentRepository;
   users: UserRepository;
+  sessions: SessionRepository;
 }

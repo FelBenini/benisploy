@@ -6,3 +6,4 @@ export { apps } from "./apps";
 export { deployments } from "./deployments";
 export { envVars } from "./env-vars";
 export { auditLog } from "./audit-log";
+export { sessions } from "./sessions";
