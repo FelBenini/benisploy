@@ -1,0 +1,49 @@
+import { eq } from "drizzle-orm";
+import type { UserRepository } from "../../ports/repository";
+import type { User } from "../../domain/user";
+import type { DrizzleDB } from "./drizzle-repository";
+import { users } from "../../db/schema";
+
+function toDomain(row: typeof users.$inferSelect): User {
+  return {
+    id: row.id,
+    email: row.email,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+export class DrizzleUserRepository implements UserRepository {
+  constructor(private db: DrizzleDB) {}
+
+  async create(orgId: string, user: User): Promise<User> {
+    const [row] = await this.db
+      .insert(users)
+      .values({
+        id: user.id,
+        email: user.email,
+        passwordHash: "",
+        createdAt: new Date(user.createdAt),
+        updatedAt: new Date(),
+      })
+      .returning();
+    return toDomain(row);
+  }
+
+  async get(orgId: string, id: string): Promise<User | null> {
+    const [row] = await this.db
+      .select()
+      .from(users)
+      .where(eq(users.id, id))
+      .limit(1);
+    return row ? toDomain(row) : null;
+  }
+
+  async getByEmail(orgId: string, email: string): Promise<User | null> {
+    const [row] = await this.db
+      .select()
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1);
+    return row ? toDomain(row) : null;
+  }
+}

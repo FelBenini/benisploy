@@ -11,6 +11,7 @@ export interface DeployAppOutput {
 
 export function createDeployApp(repo: Repository, nodeAgent: NodeAgentClient) {
   return async function deployApp(
+    orgId: string,
     appSpec: AppSpec,
     serverId: string,
   ): Promise<DeployAppOutput> {
@@ -25,7 +26,7 @@ export function createDeployApp(repo: Repository, nodeAgent: NodeAgentClient) {
       updatedAt: now,
     };
 
-    const createdApp = await repo.createApp(app);
+    const createdApp = await repo.apps.create(orgId, app);
 
     const version = 1;
     const deployment: Deployment = {
@@ -39,16 +40,23 @@ export function createDeployApp(repo: Repository, nodeAgent: NodeAgentClient) {
       updatedAt: now,
     };
 
-    const createdDeployment = await repo.createDeployment(deployment);
+    const createdDeployment = await repo.deployments.create(orgId, deployment);
 
-    await repo.updateDeploymentStatus(createdDeployment.id, "executing");
+    await repo.deployments.updateStatus(
+      orgId,
+      createdDeployment.id,
+      "executing",
+    );
     await nodeAgent.deploy(serverId, createdDeployment.id, appSpec);
 
-    await repo.updateDeploymentStatus(createdDeployment.id, "healthy");
-    await repo.updateAppStatus(createdApp.id, "healthy");
+    await repo.deployments.updateStatus(orgId, createdDeployment.id, "healthy");
+    await repo.apps.updateStatus(orgId, createdApp.id, "healthy");
 
-    const finalApp = (await repo.getApp(createdApp.id))!;
-    const finalDeployment = (await repo.getLatestDeployment(createdApp.id))!;
+    const finalApp = (await repo.apps.get(orgId, createdApp.id))!;
+    const finalDeployment = (await repo.deployments.getLatest(
+      orgId,
+      createdApp.id,
+    ))!;
 
     return { app: finalApp, deployment: finalDeployment };
   };

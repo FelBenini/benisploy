@@ -3,6 +3,7 @@ import {
   InMemoryRepository,
   validAppSpec,
   FakeNodeAgentClient,
+  TEST_ORG_ID,
 } from "./test-utils";
 import { createListApps } from "./list-apps";
 import { createDeployApp } from "./deploy-app";
@@ -12,7 +13,7 @@ describe("listApps", () => {
     const repo = new InMemoryRepository();
     const listApps = createListApps(repo);
 
-    const apps = await listApps();
+    const apps = await listApps(TEST_ORG_ID);
     expect(apps).toEqual([]);
   });
 
@@ -22,11 +23,15 @@ describe("listApps", () => {
     const deployApp = createDeployApp(repo, nodeAgent);
     const listApps = createListApps(repo);
 
-    await deployApp(validAppSpec({ name: "app-one" }), "server-1");
-    await deployApp(validAppSpec({ name: "app-two" }), "server-2");
-    await deployApp(validAppSpec({ name: "app-three" }), "server-1");
+    await deployApp(TEST_ORG_ID, validAppSpec({ name: "app-one" }), "server-1");
+    await deployApp(TEST_ORG_ID, validAppSpec({ name: "app-two" }), "server-2");
+    await deployApp(
+      TEST_ORG_ID,
+      validAppSpec({ name: "app-three" }),
+      "server-1",
+    );
 
-    const apps = await listApps();
+    const apps = await listApps(TEST_ORG_ID);
 
     expect(apps).toHaveLength(3);
     const names = apps.map((a) => a.name).sort();

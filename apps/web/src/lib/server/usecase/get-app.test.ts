@@ -1,8 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { InMemoryRepository, validAppSpec } from "./test-utils";
+import {
+  InMemoryRepository,
+  validAppSpec,
+  FakeNodeAgentClient,
+  TEST_ORG_ID,
+} from "./test-utils";
 import { createGetApp } from "./get-app";
 import { createDeployApp } from "./deploy-app";
-import { FakeNodeAgentClient } from "./test-utils";
 import type { App } from "../domain/app";
 
 describe("getApp", () => {
@@ -10,7 +14,7 @@ describe("getApp", () => {
     const repo = new InMemoryRepository();
     const getApp = createGetApp(repo);
 
-    const result = await getApp("non-existent-id");
+    const result = await getApp(TEST_ORG_ID, "non-existent-id");
     expect(result).toBeNull();
   });
 
@@ -21,11 +25,12 @@ describe("getApp", () => {
     const getApp = createGetApp(repo);
 
     const deployResult = await deployApp(
+      TEST_ORG_ID,
       validAppSpec({ name: "my-app" }),
       "server-1",
     );
 
-    const result = await getApp(deployResult.app.id);
+    const result = await getApp(TEST_ORG_ID, deployResult.app.id);
 
     expect(result).not.toBeNull();
     expect(result!.app.name).toBe("my-app");
@@ -46,9 +51,9 @@ describe("getApp", () => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    await repo.createApp(app);
+    await repo.apps.create(TEST_ORG_ID, app);
 
-    const result = await getApp("app-no-deploy");
+    const result = await getApp(TEST_ORG_ID, "app-no-deploy");
     expect(result).not.toBeNull();
     expect(result!.currentDeployment).toBeNull();
   });
