@@ -9,12 +9,13 @@ export interface AppWithDeployment {
 
 export function createGetApp(repo: Repository) {
   return async function getApp(
+    orgId: string,
     appId: string,
   ): Promise<AppWithDeployment | null> {
-    const app = await repo.getApp(appId);
+    const app = await repo.getApp(orgId, appId);
     if (!app) return null;
 
-    const currentDeployment = await repo.getLatestDeployment(appId);
+    const currentDeployment = await repo.getLatestDeployment(orgId, appId);
     return { app, currentDeployment };
   };
 }

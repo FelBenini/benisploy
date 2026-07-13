@@ -3,6 +3,7 @@ import type { Server, CreateServerInput } from "../domain/server";
 
 export function createRegisterServer(repo: Repository) {
   return async function registerServer(
+    orgId: string,
     input: CreateServerInput,
   ): Promise<Server> {
     const now = new Date().toISOString();
@@ -14,6 +15,6 @@ export function createRegisterServer(repo: Repository) {
       createdAt: now,
       updatedAt: now,
     };
-    return repo.createServer(server);
+    return repo.createServer(orgId, server);
   };
 }

@@ -7,105 +7,150 @@ import type { User } from "../domain/user";
 import type { AppSpec } from "../domain/app-spec";
 
 export class InMemoryRepository implements Repository {
-  servers = new Map<string, Server>();
-  apps = new Map<string, App>();
-  deployments = new Map<string, Deployment>();
-  users = new Map<string, User>();
+  servers = new Map<string, { data: Server; orgId: string }>();
+  apps = new Map<string, { data: App; orgId: string }>();
+  deployments = new Map<string, { data: Deployment; orgId: string }>();
+  users = new Map<string, { data: User; orgId: string }>();
 
-  async createServer(data: Server): Promise<Server> {
-    this.servers.set(data.id, data);
+  async createServer(orgId: string, data: Server): Promise<Server> {
+    this.servers.set(data.id, { data, orgId });
     return data;
   }
 
-  async getServer(id: string): Promise<Server | null> {
-    return this.servers.get(id) ?? null;
+  async getServer(orgId: string, id: string): Promise<Server | null> {
+    const entry = this.servers.get(id);
+    return entry && entry.orgId === orgId ? entry.data : null;
   }
 
-  async listServers(): Promise<Server[]> {
-    return Array.from(this.servers.values());
+  async listServers(orgId: string): Promise<Server[]> {
+    return Array.from(this.servers.values())
+      .filter((e) => e.orgId === orgId)
+      .map((e) => e.data);
   }
 
-  async updateServerStatus(id: string, status: string): Promise<void> {
-    const server = this.servers.get(id);
-    if (server) {
+  async updateServerStatus(
+    orgId: string,
+    id: string,
+    status: string,
+  ): Promise<void> {
+    const entry = this.servers.get(id);
+    if (entry && entry.orgId === orgId) {
       this.servers.set(id, {
-        ...server,
-        status: status as Server["status"],
-        updatedAt: new Date().toISOString(),
+        data: {
+          ...entry.data,
+          status: status as Server["status"],
+          updatedAt: new Date().toISOString(),
+        },
+        orgId,
       });
     }
   }
 
-  async createApp(data: App): Promise<App> {
-    this.apps.set(data.id, data);
+  async createApp(orgId: string, data: App): Promise<App> {
+    this.apps.set(data.id, { data, orgId });
     return data;
   }
 
-  async getApp(id: string): Promise<App | null> {
-    return this.apps.get(id) ?? null;
+  async getApp(orgId: string, id: string): Promise<App | null> {
+    const entry = this.apps.get(id);
+    return entry && entry.orgId === orgId ? entry.data : null;
   }
 
-  async listApps(): Promise<App[]> {
-    return Array.from(this.apps.values());
+  async listApps(orgId: string): Promise<App[]> {
+    return Array.from(this.apps.values())
+      .filter((e) => e.orgId === orgId)
+      .map((e) => e.data);
   }
 
-  async updateAppStatus(id: string, status: string): Promise<void> {
-    const app = this.apps.get(id);
-    if (app) {
+  async updateAppStatus(
+    orgId: string,
+    id: string,
+    status: string,
+  ): Promise<void> {
+    const entry = this.apps.get(id);
+    if (entry && entry.orgId === orgId) {
       this.apps.set(id, {
-        ...app,
-        status: status as App["status"],
-        updatedAt: new Date().toISOString(),
+        data: {
+          ...entry.data,
+          status: status as App["status"],
+          updatedAt: new Date().toISOString(),
+        },
+        orgId,
       });
     }
   }
 
-  async deleteApp(id: string): Promise<void> {
-    this.apps.delete(id);
+  async deleteApp(orgId: string, id: string): Promise<void> {
+    const entry = this.apps.get(id);
+    if (entry && entry.orgId === orgId) {
+      this.apps.delete(id);
+    }
   }
 
-  async createDeployment(data: Deployment): Promise<Deployment> {
-    this.deployments.set(data.id, data);
+  async createDeployment(orgId: string, data: Deployment): Promise<Deployment> {
+    this.deployments.set(data.id, { data, orgId });
     return data;
   }
 
-  async getDeploymentsForApp(appId: string): Promise<Deployment[]> {
-    return Array.from(this.deployments.values()).filter(
-      (d) => d.appId === appId,
-    );
+  async getDeploymentsForApp(
+    orgId: string,
+    appId: string,
+  ): Promise<Deployment[]> {
+    const appEntry = this.apps.get(appId);
+    if (!appEntry || appEntry.orgId !== orgId) return [];
+
+    return Array.from(this.deployments.values())
+      .filter((e) => e.data.appId === appId)
+      .map((e) => e.data);
   }
 
-  async getLatestDeployment(appId: string): Promise<Deployment | null> {
+  async getLatestDeployment(
+    orgId: string,
+    appId: string,
+  ): Promise<Deployment | null> {
+    const appEntry = this.apps.get(appId);
+    if (!appEntry || appEntry.orgId !== orgId) return null;
+
     const appDeployments = Array.from(this.deployments.values())
-      .filter((d) => d.appId === appId)
+      .filter((e) => e.data.appId === appId)
+      .map((e) => e.data)
       .sort((a, b) => b.version - a.version);
     return appDeployments[0] ?? null;
   }
 
-  async updateDeploymentStatus(id: string, status: string): Promise<void> {
+  async updateDeploymentStatus(
+    orgId: string,
+    id: string,
+    status: string,
+  ): Promise<void> {
     const dep = this.deployments.get(id);
     if (dep) {
       this.deployments.set(id, {
-        ...dep,
-        status: status as Deployment["status"],
-        updatedAt: new Date().toISOString(),
+        data: {
+          ...dep.data,
+          status: status as Deployment["status"],
+          updatedAt: new Date().toISOString(),
+        },
+        orgId,
       });
     }
   }
 
-  async createUser(user: User): Promise<User> {
-    this.users.set(user.id, user);
+  async createUser(orgId: string, user: User): Promise<User> {
+    this.users.set(user.id, { data: user, orgId });
     return user;
   }
 
-  async getUser(id: string): Promise<User | null> {
-    return this.users.get(id) ?? null;
+  async getUser(orgId: string, id: string): Promise<User | null> {
+    const entry = this.users.get(id);
+    return entry && entry.orgId === orgId ? entry.data : null;
   }
 
-  async getUserByEmail(email: string): Promise<User | null> {
-    return (
-      Array.from(this.users.values()).find((u) => u.email === email) ?? null
+  async getUserByEmail(orgId: string, email: string): Promise<User | null> {
+    const entry = Array.from(this.users.values()).find(
+      (e) => e.data.email === email,
     );
+    return entry && entry.orgId === orgId ? entry.data : null;
   }
 }
 
@@ -169,3 +214,5 @@ export function validAppSpec(overrides?: Partial<AppSpec>): AppSpec {
     ...overrides,
   };
 }
+
+export const TEST_ORG_ID = "org-test-1";

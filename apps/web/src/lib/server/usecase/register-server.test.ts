@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { InMemoryRepository } from "./test-utils";
+import { InMemoryRepository, TEST_ORG_ID } from "./test-utils";
 import { createRegisterServer } from "./register-server";
 import type { CreateServerInput } from "../domain/server";
 
@@ -17,7 +17,7 @@ describe("registerServer", () => {
       labels: { region: "us-east" },
     };
 
-    const server = await registerServer(input);
+    const server = await registerServer(TEST_ORG_ID, input);
 
     expect(server.id).toBeDefined();
     expect(server.name).toBe("my-server");
@@ -43,7 +43,7 @@ describe("registerServer", () => {
       diskBytes: 50_000_000_000,
     };
 
-    const server = await registerServer(input);
+    const server = await registerServer(TEST_ORG_ID, input);
 
     expect(server.labels).toEqual({});
   });
@@ -60,10 +60,30 @@ describe("registerServer", () => {
       diskBytes: 200_000_000_000,
     };
 
-    const server = await registerServer(input);
-    const stored = await repo.getServer(server.id);
+    const server = await registerServer(TEST_ORG_ID, input);
+    const stored = await repo.getServer(TEST_ORG_ID, server.id);
 
     expect(stored).not.toBeNull();
     expect(stored!.id).toBe(server.id);
+  });
+
+  it("scopes server creation to the given org", async () => {
+    const repo = new InMemoryRepository();
+    const registerServer = createRegisterServer(repo);
+
+    const input: CreateServerInput = {
+      name: "org-specific",
+      address: "10.0.0.3",
+      cpuCores: 2,
+      memoryBytes: 4_000_000_000,
+      diskBytes: 50_000_000_000,
+    };
+
+    await registerServer("org-a", input);
+    const inOrgA = await repo.listServers("org-a");
+    const inOrgB = await repo.listServers("org-b");
+
+    expect(inOrgA).toHaveLength(1);
+    expect(inOrgB).toHaveLength(0);
   });
 });
