@@ -6,28 +6,33 @@ let mockMarkAsConfigured: ReturnType<typeof vi.fn>;
 let mockOrgCreate: ReturnType<typeof vi.fn>;
 let mockUserCreate: ReturnType<typeof vi.fn>;
 let mockMembershipCreate: ReturnType<typeof vi.fn>;
-let mockSessionCreate: ReturnType<typeof vi.fn>;
+let mockCreateSession: ReturnType<typeof vi.fn>;
+let mockHashPassword: ReturnType<typeof vi.fn>;
 
-vi.mock("$lib/server/db/client", () => ({ db: {} }));
-
-vi.mock("$lib/server/adapters/db/drizzle-repository", () => {
+vi.mock("$lib/server/app", () => {
   mockIsConfigured = vi.fn();
   mockMarkAsConfigured = vi.fn();
   mockOrgCreate = vi.fn();
   mockUserCreate = vi.fn();
   mockMembershipCreate = vi.fn();
-  mockSessionCreate = vi.fn();
+  mockCreateSession = vi.fn();
+  mockHashPassword = vi.fn();
   return {
-    DrizzleRepository: vi.fn(() => ({
-      sessions: { create: mockSessionCreate },
-      users: { create: mockUserCreate },
+    app: {
+      repo: {
+        orgs: { create: mockOrgCreate },
+        users: { create: mockUserCreate },
+        memberships: { create: mockMembershipCreate },
+      },
+      auth: {
+        createSession: mockCreateSession,
+        hashPassword: mockHashPassword,
+      },
       systemSetup: {
         isConfigured: mockIsConfigured,
         markAsConfigured: mockMarkAsConfigured,
       },
-      orgs: { create: mockOrgCreate },
-      memberships: { create: mockMembershipCreate },
-    })),
+    },
   };
 });
 
@@ -37,7 +42,11 @@ function createRequestEvent(body: unknown): RequestEvent {
   return {
     request: new Request("http://localhost:5173/api/auth/setup", {
       method: "POST",
-      headers: { "Content-Type": "application/json", Origin: "http://localhost:5173", Host: "localhost:5173" },
+      headers: {
+        "Content-Type": "application/json",
+        Origin: "http://localhost:5173",
+        Host: "localhost:5173",
+      },
       body: JSON.stringify(body),
     }),
     cookies: {
@@ -53,11 +62,15 @@ function createRequestEvent(body: unknown): RequestEvent {
 describe("POST /api/auth/setup", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockHashPassword.mockResolvedValue("hashed-password");
   });
 
   it("returns 400 when system is already configured", async () => {
     mockIsConfigured.mockResolvedValue(true);
-    const event = createRequestEvent({ email: "admin@test.com", password: "password123" });
+    const event = createRequestEvent({
+      email: "admin@test.com",
+      password: "password123",
+    });
     const response = await POST(event);
 
     expect(response.status).toBe(400);
@@ -70,9 +83,12 @@ describe("POST /api/auth/setup", () => {
     mockOrgCreate.mockResolvedValue({});
     mockUserCreate.mockResolvedValue({});
     mockMembershipCreate.mockResolvedValue({});
-    mockSessionCreate.mockResolvedValue(undefined);
+    mockCreateSession.mockResolvedValue({ token: "session-id.secret" });
 
-    const event = createRequestEvent({ email: "admin@test.com", password: "password123" });
+    const event = createRequestEvent({
+      email: "admin@test.com",
+      password: "password123",
+    });
     const response = await POST(event);
 
     expect(response.status).toBe(200);
@@ -83,7 +99,10 @@ describe("POST /api/auth/setup", () => {
 
   it("returns 400 for invalid email", async () => {
     mockIsConfigured.mockResolvedValue(false);
-    const event = createRequestEvent({ email: "not-email", password: "password123" });
+    const event = createRequestEvent({
+      email: "not-email",
+      password: "password123",
+    });
     const response = await POST(event);
 
     expect(response.status).toBe(400);
@@ -91,7 +110,10 @@ describe("POST /api/auth/setup", () => {
 
   it("returns 400 for short password", async () => {
     mockIsConfigured.mockResolvedValue(false);
-    const event = createRequestEvent({ email: "admin@test.com", password: "1234567" });
+    const event = createRequestEvent({
+      email: "admin@test.com",
+      password: "1234567",
+    });
     const response = await POST(event);
 
     expect(response.status).toBe(400);
@@ -102,10 +124,19 @@ describe("POST /api/auth/setup", () => {
     const event = {
       request: new Request("http://localhost:5173/api/auth/setup", {
         method: "POST",
-        headers: { "Content-Type": "text/plain", Origin: "http://localhost:5173", Host: "localhost:5173" },
+        headers: {
+          "Content-Type": "text/plain",
+          Origin: "http://localhost:5173",
+          Host: "localhost:5173",
+        },
         body: "not-json",
       }),
-      cookies: { get: vi.fn(), set: vi.fn(), delete: vi.fn(), serialize: vi.fn() },
+      cookies: {
+        get: vi.fn(),
+        set: vi.fn(),
+        delete: vi.fn(),
+        serialize: vi.fn(),
+      },
       locals: {},
     } as unknown as RequestEvent;
 
@@ -120,9 +151,12 @@ describe("POST /api/auth/setup", () => {
     mockOrgCreate.mockResolvedValue({});
     mockUserCreate.mockResolvedValue({});
     mockMembershipCreate.mockResolvedValue({});
-    mockSessionCreate.mockResolvedValue(undefined);
+    mockCreateSession.mockResolvedValue({ token: "session-id.secret" });
 
-    const event = createRequestEvent({ email: "admin@test.com", password: "password123" });
+    const event = createRequestEvent({
+      email: "admin@test.com",
+      password: "password123",
+    });
     await POST(event);
 
     expect(mockOrgCreate).toHaveBeenCalledWith(
@@ -143,9 +177,12 @@ describe("POST /api/auth/setup", () => {
     mockOrgCreate.mockResolvedValue({});
     mockUserCreate.mockResolvedValue({});
     mockMembershipCreate.mockResolvedValue({});
-    mockSessionCreate.mockResolvedValue(undefined);
+    mockCreateSession.mockResolvedValue({ token: "session-id.secret" });
 
-    const event = createRequestEvent({ email: "admin@test.com", password: "password123" });
+    const event = createRequestEvent({
+      email: "admin@test.com",
+      password: "password123",
+    });
     await POST(event);
 
     expect(mockMarkAsConfigured).toHaveBeenCalled();
@@ -156,16 +193,28 @@ describe("POST /api/auth/setup", () => {
     mockOrgCreate.mockResolvedValue({});
     mockUserCreate.mockResolvedValue({});
     mockMembershipCreate.mockResolvedValue({});
-    mockSessionCreate.mockResolvedValue(undefined);
+    mockCreateSession.mockResolvedValue({ token: "session-id.secret" });
 
     const cookieSet = vi.fn();
     const event = {
       request: new Request("http://localhost:5173/api/auth/setup", {
         method: "POST",
-        headers: { "Content-Type": "application/json", Origin: "http://localhost:5173", Host: "localhost:5173" },
-        body: JSON.stringify({ email: "admin@test.com", password: "password123" }),
+        headers: {
+          "Content-Type": "application/json",
+          Origin: "http://localhost:5173",
+          Host: "localhost:5173",
+        },
+        body: JSON.stringify({
+          email: "admin@test.com",
+          password: "password123",
+        }),
       }),
-      cookies: { get: vi.fn(), set: cookieSet, delete: vi.fn(), serialize: vi.fn() },
+      cookies: {
+        get: vi.fn(),
+        set: cookieSet,
+        delete: vi.fn(),
+        serialize: vi.fn(),
+      },
       locals: {},
     } as unknown as RequestEvent;
 
@@ -173,7 +222,11 @@ describe("POST /api/auth/setup", () => {
     expect(cookieSet).toHaveBeenCalledWith(
       "session_token",
       expect.stringContaining("."),
-      expect.objectContaining({ httpOnly: true, secure: true, sameSite: "lax" }),
+      expect.objectContaining({
+        httpOnly: true,
+        secure: true,
+        sameSite: "lax",
+      }),
     );
   });
 });

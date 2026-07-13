@@ -146,7 +146,11 @@ class InMemoryUserRepo implements UserRepository {
   items = new Map<string, { data: User; orgId: string }>();
   passwordHashes = new Map<string, string>();
 
-  async create(orgId: string, user: User, passwordHash?: string): Promise<User> {
+  async create(
+    orgId: string,
+    user: User,
+    passwordHash?: string,
+  ): Promise<User> {
     this.items.set(user.id, { data: user, orgId });
     if (passwordHash) {
       this.passwordHashes.set(user.id, passwordHash);
@@ -231,6 +235,10 @@ class InMemoryMembershipRepo implements OrgMembershipRepository {
   async create(membership: OrgMembership): Promise<OrgMembership> {
     this.items.push({ ...membership });
     return membership;
+  }
+
+  async findByUserId(userId: string): Promise<OrgMembership | null> {
+    return this.items.find((m) => m.userId === userId) ?? null;
   }
 }
 

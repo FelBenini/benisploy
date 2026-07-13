@@ -4,6 +4,7 @@ declare global {
   namespace App {
     interface Locals {
       session: Session | null;
+      orgId: string | null;
     }
   }
 }

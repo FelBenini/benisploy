@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import type { OrgMembershipRepository } from "../../ports/repository";
 import type { OrgMembership } from "../../domain/org-membership";
 import type { DrizzleDB } from "./drizzle-repository";
@@ -26,5 +27,14 @@ export class DrizzleOrgMembershipRepository implements OrgMembershipRepository {
       })
       .returning();
     return toDomain(row);
+  }
+
+  async findByUserId(userId: string): Promise<OrgMembership | null> {
+    const [row] = await this.db
+      .select()
+      .from(orgMemberships)
+      .where(eq(orgMemberships.userId, userId))
+      .limit(1);
+    return row ? toDomain(row) : null;
   }
 }

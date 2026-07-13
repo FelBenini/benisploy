@@ -1,16 +1,11 @@
 import { json } from "@sveltejs/kit";
 import type { RequestHandler } from "./$types";
 import { z } from "zod";
-import { db } from "$lib/server/db/client";
-import { DrizzleRepository } from "$lib/server/adapters/db/drizzle-repository";
+import { app } from "$lib/server/app";
 import {
-  createSession,
   SESSION_COOKIE,
   SESSION_EXPIRES_IN_SECONDS,
 } from "$lib/server/auth/session";
-import { verifyPassword } from "$lib/server/auth/password";
-
-const repo = new DrizzleRepository(db);
 
 const LoginSchema = z.object({
   email: z.string().email(),
@@ -35,17 +30,17 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 
   const { email, password } = parsed.data;
 
-  const result = await repo.users.getPasswordHashByEmail(email);
+  const result = await app.repo.users.getPasswordHashByEmail(email);
   if (!result) {
     return json({ error: "Invalid email or password" }, { status: 401 });
   }
 
-  const valid = await verifyPassword(password, result.passwordHash);
+  const valid = await app.auth.verifyPassword(password, result.passwordHash);
   if (!valid) {
     return json({ error: "Invalid email or password" }, { status: 401 });
   }
 
-  const session = await createSession(repo.sessions, result.user.id);
+  const session = await app.auth.createSession(result.user.id);
 
   cookies.set(SESSION_COOKIE, session.token, {
     path: "/",

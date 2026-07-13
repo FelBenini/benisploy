@@ -2,24 +2,14 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { RequestEvent } from "./logout/$types";
 import type { Session } from "$lib/server/domain/session";
 
-vi.mock("$lib/server/db/client", () => ({ db: {} }));
+let mockDeleteSession: ReturnType<typeof vi.fn>;
 
-const mockSessionDelete = vi.fn();
-
-vi.mock("$lib/server/adapters/db/drizzle-repository", () => ({
-  DrizzleRepository: vi.fn(() => ({
-    sessions: {
-      create: vi.fn(),
-      get: vi.fn(),
-      delete: mockSessionDelete,
-      deleteAllForUser: vi.fn(),
-    },
-    users: {},
-    servers: {},
-    apps: {},
-    deployments: {},
-  })),
-}));
+vi.mock("$lib/server/app", () => {
+  mockDeleteSession = vi.fn();
+  return {
+    app: { auth: { deleteSession: mockDeleteSession } },
+  };
+});
 
 const { POST } = await import("./logout/+server");
 
@@ -37,6 +27,7 @@ describe("POST /api/auth/logout", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
+
   it("returns 204 and clears cookie when session exists", async () => {
     const cookieDelete = vi.fn();
     const event = {
@@ -52,7 +43,7 @@ describe("POST /api/auth/logout", () => {
     const response = await POST(event);
 
     expect(response.status).toBe(204);
-    expect(mockSessionDelete).toHaveBeenCalledWith("session-1");
+    expect(mockDeleteSession).toHaveBeenCalledWith("session-1");
     expect(cookieDelete).toHaveBeenCalled();
   });
 
@@ -71,7 +62,7 @@ describe("POST /api/auth/logout", () => {
     const response = await POST(event);
 
     expect(response.status).toBe(204);
-    expect(mockSessionDelete).not.toHaveBeenCalled();
+    expect(mockDeleteSession).not.toHaveBeenCalled();
     expect(cookieDelete).toHaveBeenCalled();
   });
 });

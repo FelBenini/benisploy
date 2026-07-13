@@ -51,6 +51,7 @@ export interface OrgRepository {
 
 export interface OrgMembershipRepository {
   create(membership: OrgMembership): Promise<OrgMembership>;
+  findByUserId(userId: string): Promise<OrgMembership | null>;
 }
 
 export interface SessionRepository {
