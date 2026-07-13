@@ -1,4 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { Handle } from "@sveltejs/kit";
+
+type HandleEvent = Parameters<Handle>[0]["event"];
 
 let mockValidateSessionToken: ReturnType<typeof vi.fn>;
 let mockFindByUserId: ReturnType<typeof vi.fn>;
@@ -16,7 +19,7 @@ vi.mock("$lib/server/app", () => {
 
 const { handle } = await import("./hooks.server");
 
-function createMockEvent() {
+function createMockEvent(): HandleEvent {
   return {
     request: new Request("http://localhost:5173"),
     cookies: {
@@ -24,9 +27,25 @@ function createMockEvent() {
       set: vi.fn(),
       delete: vi.fn(),
       serialize: vi.fn(),
+      getAll: vi.fn().mockReturnValue([]),
     },
-    locals: {} as Record<string, unknown>,
-  } as any;
+    locals: {} as App.Locals,
+    params: {},
+    route: { id: null },
+    url: new URL("http://localhost:5173"),
+    fetch: vi.fn(),
+    setHeaders: vi.fn(),
+    getClientAddress: () => "127.0.0.1",
+    platform: undefined,
+    isDataRequest: false,
+    isSubRequest: false,
+    isRemoteRequest: false,
+    tracing: {
+      enabled: false,
+      root: null,
+      current: null,
+    },
+  };
 }
 
 describe("handle hook", () => {
