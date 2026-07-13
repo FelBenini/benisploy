@@ -70,7 +70,7 @@ describe("DrizzleRepository integration", () => {
     expect(server.name).toBe("integration-server");
     expect(server.status).toBe("offline");
 
-    const stored = await repo.getServer(ORG, server.id);
+    const stored = await repo.servers.get(ORG, server.id);
     expect(stored).not.toBeNull();
     expect(stored!.name).toBe("integration-server");
   });
@@ -103,10 +103,10 @@ describe("DrizzleRepository integration", () => {
     expect(result.deployment.version).toBe(1);
     expect(result.deployment.status).toBe("healthy");
 
-    const stored = await repo.getApp(ORG, result.app.id);
+    const stored = await repo.apps.get(ORG, result.app.id);
     expect(stored).not.toBeNull();
 
-    const deployments = await repo.getDeploymentsForApp(ORG, result.app.id);
+    const deployments = await repo.deployments.listForApp(ORG, result.app.id);
     expect(deployments).toHaveLength(1);
   });
 
@@ -192,8 +192,8 @@ describe("DrizzleRepository integration", () => {
       diskBytes: 50_000_000_000,
     });
 
-    const alphaServers = await repo.listServers("org-alpha");
-    const betaServers = await repo.listServers("org-beta");
+    const alphaServers = await repo.servers.list("org-alpha");
+    const betaServers = await repo.servers.list("org-beta");
 
     expect(alphaServers).toHaveLength(1);
     expect(betaServers).toHaveLength(0);

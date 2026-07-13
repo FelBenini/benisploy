@@ -12,10 +12,10 @@ export function createGetApp(repo: Repository) {
     orgId: string,
     appId: string,
   ): Promise<AppWithDeployment | null> {
-    const app = await repo.getApp(orgId, appId);
+    const app = await repo.apps.get(orgId, appId);
     if (!app) return null;
 
-    const currentDeployment = await repo.getLatestDeployment(orgId, appId);
+    const currentDeployment = await repo.deployments.getLatest(orgId, appId);
     return { app, currentDeployment };
   };
 }

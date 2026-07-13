@@ -51,7 +51,7 @@ describe("getApp", () => {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    await repo.createApp(TEST_ORG_ID, app);
+    await repo.apps.create(TEST_ORG_ID, app);
 
     const result = await getApp(TEST_ORG_ID, "app-no-deploy");
     expect(result).not.toBeNull();

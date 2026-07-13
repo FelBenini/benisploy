@@ -49,11 +49,11 @@ describe("deployApp", () => {
     const spec = validAppSpec({ name: "persisted-app" });
     const result = await deployApp(TEST_ORG_ID, spec, serverId);
 
-    const storedApp = await repo.getApp(TEST_ORG_ID, result.app.id);
+    const storedApp = await repo.apps.get(TEST_ORG_ID, result.app.id);
     expect(storedApp).not.toBeNull();
     expect(storedApp!.name).toBe("persisted-app");
 
-    const storedDeployments = await repo.getDeploymentsForApp(
+    const storedDeployments = await repo.deployments.listForApp(
       TEST_ORG_ID,
       result.app.id,
     );
@@ -69,7 +69,7 @@ describe("deployApp", () => {
 
     expect(result.deployment.status).toBe("healthy");
 
-    const initialDeployments = await repo.getDeploymentsForApp(
+    const initialDeployments = await repo.deployments.listForApp(
       TEST_ORG_ID,
       result.app.id,
     );

@@ -1,4 +1,10 @@
-import type { Repository } from "../ports/repository";
+import type {
+  Repository,
+  ServerRepository,
+  AppRepository,
+  DeploymentRepository,
+  UserRepository,
+} from "../ports/repository";
 import type { NodeAgentClient, LogEntry } from "../ports/node-agent-client";
 import type { App } from "../domain/app";
 import type { Deployment } from "../domain/deployment";
@@ -6,36 +12,29 @@ import type { Server, ServerStatusReport } from "../domain/server";
 import type { User } from "../domain/user";
 import type { AppSpec } from "../domain/app-spec";
 
-export class InMemoryRepository implements Repository {
-  servers = new Map<string, { data: Server; orgId: string }>();
-  apps = new Map<string, { data: App; orgId: string }>();
-  deployments = new Map<string, { data: Deployment; orgId: string }>();
-  users = new Map<string, { data: User; orgId: string }>();
+class InMemoryServerRepo implements ServerRepository {
+  items = new Map<string, { data: Server; orgId: string }>();
 
-  async createServer(orgId: string, data: Server): Promise<Server> {
-    this.servers.set(data.id, { data, orgId });
+  async create(orgId: string, data: Server): Promise<Server> {
+    this.items.set(data.id, { data, orgId });
     return data;
   }
 
-  async getServer(orgId: string, id: string): Promise<Server | null> {
-    const entry = this.servers.get(id);
+  async get(orgId: string, id: string): Promise<Server | null> {
+    const entry = this.items.get(id);
     return entry && entry.orgId === orgId ? entry.data : null;
   }
 
-  async listServers(orgId: string): Promise<Server[]> {
-    return Array.from(this.servers.values())
+  async list(orgId: string): Promise<Server[]> {
+    return Array.from(this.items.values())
       .filter((e) => e.orgId === orgId)
       .map((e) => e.data);
   }
 
-  async updateServerStatus(
-    orgId: string,
-    id: string,
-    status: string,
-  ): Promise<void> {
-    const entry = this.servers.get(id);
+  async updateStatus(orgId: string, id: string, status: string): Promise<void> {
+    const entry = this.items.get(id);
     if (entry && entry.orgId === orgId) {
-      this.servers.set(id, {
+      this.items.set(id, {
         data: {
           ...entry.data,
           status: status as Server["status"],
@@ -45,31 +44,31 @@ export class InMemoryRepository implements Repository {
       });
     }
   }
+}
 
-  async createApp(orgId: string, data: App): Promise<App> {
-    this.apps.set(data.id, { data, orgId });
+class InMemoryAppRepo implements AppRepository {
+  items = new Map<string, { data: App; orgId: string }>();
+
+  async create(orgId: string, data: App): Promise<App> {
+    this.items.set(data.id, { data, orgId });
     return data;
   }
 
-  async getApp(orgId: string, id: string): Promise<App | null> {
-    const entry = this.apps.get(id);
+  async get(orgId: string, id: string): Promise<App | null> {
+    const entry = this.items.get(id);
     return entry && entry.orgId === orgId ? entry.data : null;
   }
 
-  async listApps(orgId: string): Promise<App[]> {
-    return Array.from(this.apps.values())
+  async list(orgId: string): Promise<App[]> {
+    return Array.from(this.items.values())
       .filter((e) => e.orgId === orgId)
       .map((e) => e.data);
   }
 
-  async updateAppStatus(
-    orgId: string,
-    id: string,
-    status: string,
-  ): Promise<void> {
-    const entry = this.apps.get(id);
+  async updateStatus(orgId: string, id: string, status: string): Promise<void> {
+    const entry = this.items.get(id);
     if (entry && entry.orgId === orgId) {
-      this.apps.set(id, {
+      this.items.set(id, {
         data: {
           ...entry.data,
           status: status as App["status"],
@@ -80,52 +79,51 @@ export class InMemoryRepository implements Repository {
     }
   }
 
-  async deleteApp(orgId: string, id: string): Promise<void> {
-    const entry = this.apps.get(id);
+  async delete(orgId: string, id: string): Promise<void> {
+    const entry = this.items.get(id);
     if (entry && entry.orgId === orgId) {
-      this.apps.delete(id);
+      this.items.delete(id);
     }
   }
+}
 
-  async createDeployment(orgId: string, data: Deployment): Promise<Deployment> {
-    this.deployments.set(data.id, { data, orgId });
+class InMemoryDeploymentRepo implements DeploymentRepository {
+  items = new Map<string, { data: Deployment; orgId: string }>();
+  apps: InMemoryAppRepo;
+
+  constructor(apps: InMemoryAppRepo) {
+    this.apps = apps;
+  }
+
+  async create(orgId: string, data: Deployment): Promise<Deployment> {
+    this.items.set(data.id, { data, orgId });
     return data;
   }
 
-  async getDeploymentsForApp(
-    orgId: string,
-    appId: string,
-  ): Promise<Deployment[]> {
-    const appEntry = this.apps.get(appId);
+  async listForApp(orgId: string, appId: string): Promise<Deployment[]> {
+    const appEntry = this.apps.items.get(appId);
     if (!appEntry || appEntry.orgId !== orgId) return [];
 
-    return Array.from(this.deployments.values())
+    return Array.from(this.items.values())
       .filter((e) => e.data.appId === appId)
       .map((e) => e.data);
   }
 
-  async getLatestDeployment(
-    orgId: string,
-    appId: string,
-  ): Promise<Deployment | null> {
-    const appEntry = this.apps.get(appId);
+  async getLatest(orgId: string, appId: string): Promise<Deployment | null> {
+    const appEntry = this.apps.items.get(appId);
     if (!appEntry || appEntry.orgId !== orgId) return null;
 
-    const appDeployments = Array.from(this.deployments.values())
+    const appDeployments = Array.from(this.items.values())
       .filter((e) => e.data.appId === appId)
       .map((e) => e.data)
       .sort((a, b) => b.version - a.version);
     return appDeployments[0] ?? null;
   }
 
-  async updateDeploymentStatus(
-    orgId: string,
-    id: string,
-    status: string,
-  ): Promise<void> {
-    const dep = this.deployments.get(id);
+  async updateStatus(orgId: string, id: string, status: string): Promise<void> {
+    const dep = this.items.get(id);
     if (dep) {
-      this.deployments.set(id, {
+      this.items.set(id, {
         data: {
           ...dep.data,
           status: status as Deployment["status"],
@@ -135,22 +133,40 @@ export class InMemoryRepository implements Repository {
       });
     }
   }
+}
 
-  async createUser(orgId: string, user: User): Promise<User> {
-    this.users.set(user.id, { data: user, orgId });
+class InMemoryUserRepo implements UserRepository {
+  items = new Map<string, { data: User; orgId: string }>();
+
+  async create(orgId: string, user: User): Promise<User> {
+    this.items.set(user.id, { data: user, orgId });
     return user;
   }
 
-  async getUser(orgId: string, id: string): Promise<User | null> {
-    const entry = this.users.get(id);
+  async get(orgId: string, id: string): Promise<User | null> {
+    const entry = this.items.get(id);
     return entry && entry.orgId === orgId ? entry.data : null;
   }
 
-  async getUserByEmail(orgId: string, email: string): Promise<User | null> {
-    const entry = Array.from(this.users.values()).find(
+  async getByEmail(orgId: string, email: string): Promise<User | null> {
+    const entry = Array.from(this.items.values()).find(
       (e) => e.data.email === email,
     );
     return entry && entry.orgId === orgId ? entry.data : null;
+  }
+}
+
+export class InMemoryRepository implements Repository {
+  servers: InMemoryServerRepo;
+  apps: InMemoryAppRepo;
+  deployments: InMemoryDeploymentRepo;
+  users: InMemoryUserRepo;
+
+  constructor() {
+    this.apps = new InMemoryAppRepo();
+    this.servers = new InMemoryServerRepo();
+    this.deployments = new InMemoryDeploymentRepo(this.apps);
+    this.users = new InMemoryUserRepo();
   }
 }
 

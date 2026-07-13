@@ -61,7 +61,7 @@ describe("registerServer", () => {
     };
 
     const server = await registerServer(TEST_ORG_ID, input);
-    const stored = await repo.getServer(TEST_ORG_ID, server.id);
+    const stored = await repo.servers.get(TEST_ORG_ID, server.id);
 
     expect(stored).not.toBeNull();
     expect(stored!.id).toBe(server.id);
@@ -80,8 +80,8 @@ describe("registerServer", () => {
     };
 
     await registerServer("org-a", input);
-    const inOrgA = await repo.listServers("org-a");
-    const inOrgB = await repo.listServers("org-b");
+    const inOrgA = await repo.servers.list("org-a");
+    const inOrgB = await repo.servers.list("org-b");
 
     expect(inOrgA).toHaveLength(1);
     expect(inOrgB).toHaveLength(0);

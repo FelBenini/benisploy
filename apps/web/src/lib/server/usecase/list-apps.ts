@@ -3,6 +3,6 @@ import type { App } from "../domain/app";
 
 export function createListApps(repo: Repository) {
   return async function listApps(orgId: string): Promise<App[]> {
-    return repo.listApps(orgId);
+    return repo.apps.list(orgId);
   };
 }

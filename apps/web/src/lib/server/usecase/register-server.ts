@@ -15,6 +15,6 @@ export function createRegisterServer(repo: Repository) {
       createdAt: now,
       updatedAt: now,
     };
-    return repo.createServer(orgId, server);
+    return repo.servers.create(orgId, server);
   };
 }
