@@ -31,7 +31,7 @@ export const CreateServerInputSchema = ServerSchema.pick({
   memoryBytes: true,
   diskBytes: true,
 }).extend({
-  labels: z.record(z.string(), z.string()).default({}),
+  labels: z.record(z.string(), z.string()).optional(),
 });
 
 export type CreateServerInput = z.infer<typeof CreateServerInputSchema>;
