@@ -5,11 +5,16 @@ import type {
   DeploymentRepository,
   UserRepository,
   SessionRepository,
+  SystemSetupRepository,
+  OrgRepository,
+  OrgMembershipRepository,
 } from "../ports/repository";
 import type { NodeAgentClient, LogEntry } from "../ports/node-agent-client";
 import type { App } from "../domain/app";
 import type { Deployment } from "../domain/deployment";
 import type { Session } from "../domain/session";
+import type { Org } from "../domain/org";
+import type { OrgMembership } from "../domain/org-membership";
 import type { Server, ServerStatusReport } from "../domain/server";
 import type { User } from "../domain/user";
 import type { AppSpec } from "../domain/app-spec";
@@ -139,9 +144,13 @@ class InMemoryDeploymentRepo implements DeploymentRepository {
 
 class InMemoryUserRepo implements UserRepository {
   items = new Map<string, { data: User; orgId: string }>();
+  passwordHashes = new Map<string, string>();
 
-  async create(orgId: string, user: User): Promise<User> {
+  async create(orgId: string, user: User, passwordHash?: string): Promise<User> {
     this.items.set(user.id, { data: user, orgId });
+    if (passwordHash) {
+      this.passwordHashes.set(user.id, passwordHash);
+    }
     return user;
   }
 
@@ -155,6 +164,17 @@ class InMemoryUserRepo implements UserRepository {
       (e) => e.data.email === email,
     );
     return entry && entry.orgId === orgId ? entry.data : null;
+  }
+
+  async getPasswordHashByEmail(
+    email: string,
+  ): Promise<{ user: User; passwordHash: string } | null> {
+    const entry = Array.from(this.items.values()).find(
+      (e) => e.data.email === email,
+    );
+    if (!entry) return null;
+    const hash = this.passwordHashes.get(entry.data.id) ?? "";
+    return { user: entry.data, passwordHash: hash };
   }
 }
 
@@ -184,12 +204,45 @@ class InMemorySessionRepo implements SessionRepository {
   }
 }
 
+class InMemorySystemSetupRepo implements SystemSetupRepository {
+  configured = false;
+
+  async isConfigured(): Promise<boolean> {
+    return this.configured;
+  }
+
+  async markAsConfigured(): Promise<void> {
+    this.configured = true;
+  }
+}
+
+class InMemoryOrgRepo implements OrgRepository {
+  items = new Map<string, Org>();
+
+  async create(org: Org): Promise<Org> {
+    this.items.set(org.id, { ...org });
+    return org;
+  }
+}
+
+class InMemoryMembershipRepo implements OrgMembershipRepository {
+  items: OrgMembership[] = [];
+
+  async create(membership: OrgMembership): Promise<OrgMembership> {
+    this.items.push({ ...membership });
+    return membership;
+  }
+}
+
 export class InMemoryRepository implements Repository {
   servers: InMemoryServerRepo;
   apps: InMemoryAppRepo;
   deployments: InMemoryDeploymentRepo;
   users: InMemoryUserRepo;
   sessions: InMemorySessionRepo;
+  systemSetup: InMemorySystemSetupRepo;
+  orgs: InMemoryOrgRepo;
+  memberships: InMemoryMembershipRepo;
 
   constructor() {
     this.apps = new InMemoryAppRepo();
@@ -197,6 +250,9 @@ export class InMemoryRepository implements Repository {
     this.deployments = new InMemoryDeploymentRepo(this.apps);
     this.users = new InMemoryUserRepo();
     this.sessions = new InMemorySessionRepo();
+    this.systemSetup = new InMemorySystemSetupRepo();
+    this.orgs = new InMemoryOrgRepo();
+    this.memberships = new InMemoryMembershipRepo();
   }
 }
 

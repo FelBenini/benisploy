@@ -15,6 +15,13 @@
       "when": 1783977355872,
       "tag": "0001_equal_longshot",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783978910199,
+      "tag": "0002_lazy_warstar",
+      "breakpoints": true
     }
   ]
 }

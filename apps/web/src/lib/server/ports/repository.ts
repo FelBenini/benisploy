@@ -1,5 +1,7 @@
 import type { App } from "../domain/app";
 import type { Deployment } from "../domain/deployment";
+import type { Org } from "../domain/org";
+import type { OrgMembership } from "../domain/org-membership";
 import type { Session } from "../domain/session";
 import type { Server, CreateServerInput } from "../domain/server";
 import type { User } from "../domain/user";
@@ -35,9 +37,20 @@ export interface DeploymentRepository {
 }
 
 export interface UserRepository {
-  create(orgId: string, user: User): Promise<User>;
+  create(orgId: string, user: User, passwordHash?: string): Promise<User>;
   get(orgId: string, id: string): Promise<User | null>;
   getByEmail(orgId: string, email: string): Promise<User | null>;
+  getPasswordHashByEmail(
+    email: string,
+  ): Promise<{ user: User; passwordHash: string } | null>;
+}
+
+export interface OrgRepository {
+  create(org: Org): Promise<Org>;
+}
+
+export interface OrgMembershipRepository {
+  create(membership: OrgMembership): Promise<OrgMembership>;
 }
 
 export interface SessionRepository {
@@ -47,10 +60,18 @@ export interface SessionRepository {
   deleteAllForUser(userId: string): Promise<void>;
 }
 
+export interface SystemSetupRepository {
+  isConfigured(): Promise<boolean>;
+  markAsConfigured(): Promise<void>;
+}
+
 export interface Repository {
   servers: ServerRepository;
   apps: AppRepository;
   deployments: DeploymentRepository;
   users: UserRepository;
   sessions: SessionRepository;
+  systemSetup: SystemSetupRepository;
+  orgs: OrgRepository;
+  memberships: OrgMembershipRepository;
 }

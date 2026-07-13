@@ -15,13 +15,13 @@ function toDomain(row: typeof users.$inferSelect): User {
 export class DrizzleUserRepository implements UserRepository {
   constructor(private db: DrizzleDB) {}
 
-  async create(orgId: string, user: User): Promise<User> {
+  async create(orgId: string, user: User, passwordHash?: string): Promise<User> {
     const [row] = await this.db
       .insert(users)
       .values({
         id: user.id,
         email: user.email,
-        passwordHash: "",
+        passwordHash: passwordHash ?? "",
         createdAt: new Date(user.createdAt),
         updatedAt: new Date(),
       })
@@ -45,5 +45,20 @@ export class DrizzleUserRepository implements UserRepository {
       .where(eq(users.email, email))
       .limit(1);
     return row ? toDomain(row) : null;
+  }
+
+  async getPasswordHashByEmail(
+    email: string,
+  ): Promise<{ user: User; passwordHash: string } | null> {
+    const [row] = await this.db
+      .select()
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1);
+    if (!row) return null;
+    return {
+      user: toDomain(row),
+      passwordHash: row.passwordHash,
+    };
   }
 }

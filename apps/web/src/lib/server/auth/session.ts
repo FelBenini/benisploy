@@ -2,6 +2,7 @@ import type { Session, SessionWithToken } from "../domain/session";
 import type { SessionRepository } from "../ports/repository";
 
 export const SESSION_EXPIRES_IN_SECONDS = 60 * 60 * 24; // 1 day
+export const SESSION_COOKIE = "session_token";
 
 const ALPHABET = "abcdefghijkmnpqrstuvwxyz23456789";
 const RANDOM_BYTES_COUNT = 24;

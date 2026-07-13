@@ -4,12 +4,10 @@ import { DrizzleRepository } from "$lib/server/adapters/db/drizzle-repository";
 import {
   validateSessionToken,
   verifyRequestOrigin,
+  SESSION_COOKIE,
 } from "$lib/server/auth/session";
 
 const repo = new DrizzleRepository(db);
-
-const SESSION_COOKIE = "session_token";
-const SESSION_COOKIE_MAX_AGE = 7 * 60 * 60 * 24; // 7 days
 
 export const handle: Handle = async ({ event, resolve }) => {
   // CSRF protection
