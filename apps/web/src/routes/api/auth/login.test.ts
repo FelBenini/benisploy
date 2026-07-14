@@ -6,11 +6,17 @@ let testPasswordHash: string;
 let mockGetPasswordHashByEmail: ReturnType<typeof vi.fn>;
 let mockVerifyPassword: ReturnType<typeof vi.fn>;
 let mockCreateSession: ReturnType<typeof vi.fn>;
+let mockIpConsume: ReturnType<typeof vi.fn>;
+let mockAccountConsume: ReturnType<typeof vi.fn>;
+let mockAccountReset: ReturnType<typeof vi.fn>;
 
 vi.mock("$lib/server/app", () => {
   mockGetPasswordHashByEmail = vi.fn();
   mockVerifyPassword = vi.fn();
   mockCreateSession = vi.fn();
+  mockIpConsume = vi.fn();
+  mockAccountConsume = vi.fn();
+  mockAccountReset = vi.fn();
   return {
     app: {
       db: {},
@@ -19,13 +25,23 @@ vi.mock("$lib/server/app", () => {
         createSession: mockCreateSession,
         verifyPassword: mockVerifyPassword,
       },
+      rateLimiters: {
+        loginByIp: { consume: mockIpConsume },
+        loginByAccount: {
+          consume: mockAccountConsume,
+          reset: mockAccountReset,
+        },
+      },
     },
   };
 });
 
 const { POST } = await import("./login/+server");
 
-function createRequestEvent(body: unknown): RequestEvent {
+function createRequestEvent(
+  body: unknown,
+  clientAddress = "203.0.113.1",
+): RequestEvent {
   return {
     request: new Request("http://localhost:5173/api/auth/login", {
       method: "POST",
@@ -42,6 +58,7 @@ function createRequestEvent(body: unknown): RequestEvent {
       delete: vi.fn(),
       serialize: vi.fn(),
     },
+    getClientAddress: () => clientAddress,
     locals: {},
   } as unknown as RequestEvent;
 }
@@ -53,6 +70,9 @@ describe("POST /api/auth/login", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default: nobody is rate limited.
+    mockIpConsume.mockResolvedValue({ allowed: true, retryAfterMs: 0 });
+    mockAccountConsume.mockResolvedValue({ allowed: true, retryAfterMs: 0 });
   });
 
   it("returns 200 with user data for valid credentials", async () => {
@@ -149,6 +169,7 @@ describe("POST /api/auth/login", () => {
         delete: vi.fn(),
         serialize: vi.fn(),
       },
+      getClientAddress: () => "203.0.113.1",
       locals: {},
     } as unknown as RequestEvent;
 
@@ -156,5 +177,94 @@ describe("POST /api/auth/login", () => {
     expect(response.status).toBe(400);
     const body = await response.json();
     expect(body.error).toBe("Invalid JSON body");
+  });
+
+  describe("rate limiting", () => {
+    it("returns 429 when the per-IP limit is exceeded, without touching the DB", async () => {
+      mockIpConsume.mockResolvedValue({ allowed: false, retryAfterMs: 42_000 });
+
+      const event = createRequestEvent({
+        email: "test@example.com",
+        password: "test-password",
+      });
+      const response = await POST(event);
+
+      expect(response.status).toBe(429);
+      expect(response.headers.get("Retry-After")).toBe("42");
+      expect(mockGetPasswordHashByEmail).not.toHaveBeenCalled();
+      expect(mockVerifyPassword).not.toHaveBeenCalled();
+    });
+
+    it("returns 429 when the per-account limit is exceeded, without touching the DB", async () => {
+      mockAccountConsume.mockResolvedValue({
+        allowed: false,
+        retryAfterMs: 15_000,
+      });
+
+      const event = createRequestEvent({
+        email: "test@example.com",
+        password: "test-password",
+      });
+      const response = await POST(event);
+
+      expect(response.status).toBe(429);
+      expect(response.headers.get("Retry-After")).toBe("15");
+      expect(mockGetPasswordHashByEmail).not.toHaveBeenCalled();
+    });
+
+    it("checks both IP and account keyed on the request, not on stale state", async () => {
+      const event = createRequestEvent(
+        { email: "Test@Example.com", password: "test-password" },
+        "198.51.100.7",
+      );
+      mockGetPasswordHashByEmail.mockResolvedValue(null);
+
+      await POST(event);
+
+      expect(mockIpConsume).toHaveBeenCalledWith("ip:198.51.100.7");
+      // Email is lowercased before being used as a limiter key.
+      expect(mockAccountConsume).toHaveBeenCalledWith("email:test@example.com");
+    });
+
+    it("resets the account limiter on successful login", async () => {
+      mockGetPasswordHashByEmail.mockResolvedValue({
+        user: {
+          id: "user-1",
+          email: "test@example.com",
+          createdAt: new Date().toISOString(),
+        },
+        passwordHash: testPasswordHash,
+      });
+      mockVerifyPassword.mockResolvedValue(true);
+      mockCreateSession.mockResolvedValue({ token: "session-id.secret" });
+
+      const event = createRequestEvent({
+        email: "test@example.com",
+        password: "test-password",
+      });
+      await POST(event);
+
+      expect(mockAccountReset).toHaveBeenCalledWith("email:test@example.com");
+    });
+
+    it("does not reset the account limiter on failed login", async () => {
+      mockGetPasswordHashByEmail.mockResolvedValue({
+        user: {
+          id: "user-1",
+          email: "test@example.com",
+          createdAt: new Date().toISOString(),
+        },
+        passwordHash: testPasswordHash,
+      });
+      mockVerifyPassword.mockResolvedValue(false);
+
+      const event = createRequestEvent({
+        email: "test@example.com",
+        password: "wrong-password",
+      });
+      await POST(event);
+
+      expect(mockAccountReset).not.toHaveBeenCalled();
+    });
   });
 });

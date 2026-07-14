@@ -12,7 +12,11 @@ const LoginSchema = z.object({
   password: z.string().min(1),
 });
 
-export const POST: RequestHandler = async ({ request, cookies }) => {
+export const POST: RequestHandler = async ({
+  request,
+  cookies,
+  getClientAddress,
+}) => {
   let body: unknown;
   try {
     body = await request.json();
@@ -28,7 +32,29 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
     );
   }
 
-  const { email, password } = parsed.data;
+  const { password } = parsed.data;
+  const email = parsed.data.email.toLowerCase();
+
+  const ipCheck = await app.rateLimiters.loginByIp.consume(
+    `ip:${getClientAddress()}`,
+  );
+  const accountCheck = await app.rateLimiters.loginByAccount.consume(
+    `email:${email}`,
+  );
+
+  if (!ipCheck.allowed || !accountCheck.allowed) {
+    const retryAfterMs = Math.max(
+      ipCheck.retryAfterMs,
+      accountCheck.retryAfterMs,
+    );
+    return json(
+      { error: "Too many login attempts. Try again later." },
+      {
+        status: 429,
+        headers: { "Retry-After": String(Math.ceil(retryAfterMs / 1000)) },
+      },
+    );
+  }
 
   const result = await app.repo.users.getPasswordHashByEmail(email);
   if (!result) {
@@ -39,6 +65,8 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
   if (!valid) {
     return json({ error: "Invalid email or password" }, { status: 401 });
   }
+
+  await app.rateLimiters.loginByAccount.reset(`email:${email}`);
 
   const session = await app.auth.createSession(app.db, result.user.id);
 

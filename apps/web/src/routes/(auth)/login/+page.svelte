@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { goto } from "$app/navigation";
   let { data } = $props();
 
   let email = $state("");
@@ -25,8 +26,7 @@
         error = body.error ?? "Something went wrong";
         return;
       }
-
-      window.location.href = "/app";
+      goto("/");
     } catch {
       error = "Network error";
     } finally {
