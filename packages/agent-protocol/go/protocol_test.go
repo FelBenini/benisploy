@@ -121,6 +121,45 @@ func TestEnvelopeRoundTrip(t *testing.T) {
 	}
 }
 
+func TestHeartbeatPayloadExtendedRoundTrip(t *testing.T) {
+	in := HeartbeatPayload{
+		ServerID:      "srv-ext",
+		Hostname:      "myserver.local",
+		CPUPercent:    42.5,
+		MemoryUsed:    8_000_000_000,
+		MemoryTotal:   16_000_000_000,
+		DiskUsed:      200_000_000_000,
+		DiskTotal:     500_000_000_000,
+		UptimeSeconds: 7200,
+	}
+	out := roundTrip(t, in)
+
+	if out.ServerID != "srv-ext" {
+		t.Fatalf("ServerID: got %q, want %q", out.ServerID, "srv-ext")
+	}
+	if out.Hostname != "myserver.local" {
+		t.Fatalf("Hostname: got %q, want %q", out.Hostname, "myserver.local")
+	}
+	if out.CPUPercent != 42.5 {
+		t.Fatalf("CPUPercent: got %f, want %f", out.CPUPercent, 42.5)
+	}
+	if out.MemoryUsed != 8_000_000_000 {
+		t.Fatalf("MemoryUsed: got %d, want %d", out.MemoryUsed, 8_000_000_000)
+	}
+	if out.MemoryTotal != 16_000_000_000 {
+		t.Fatalf("MemoryTotal: got %d, want %d", out.MemoryTotal, 16_000_000_000)
+	}
+	if out.DiskUsed != 200_000_000_000 {
+		t.Fatalf("DiskUsed: got %d, want %d", out.DiskUsed, 200_000_000_000)
+	}
+	if out.DiskTotal != 500_000_000_000 {
+		t.Fatalf("DiskTotal: got %d, want %d", out.DiskTotal, 500_000_000_000)
+	}
+	if out.UptimeSeconds != 7200 {
+		t.Fatalf("UptimeSeconds: got %d, want %d", out.UptimeSeconds, 7200)
+	}
+}
+
 func TestStreamLogsPayloadRoundTrip(t *testing.T) {
 	in := StreamLogsPayload{
 		AppID:  "app-1",
