@@ -125,8 +125,18 @@ type LogEntryPayload struct {
 
 // ── heartbeat / heartbeat_ack ───────────────────────────────────────────
 
+// HeartbeatPayload is sent periodically by the node agent to report
+// liveness and basic host facts. The control plane uses this to flip
+// the server status to "online" and cache the metrics for get_server_status.
 type HeartbeatPayload struct {
-	ServerID string `json:"serverId"`
+	ServerID      string  `json:"serverId"`
+	Hostname      string  `json:"hostname"`
+	CPUPercent    float64 `json:"cpuPercent"`
+	MemoryUsed    int64   `json:"memoryUsed"`
+	MemoryTotal   int64   `json:"memoryTotal"`
+	DiskUsed      int64   `json:"diskUsed"`
+	DiskTotal     int64   `json:"diskTotal"`
+	UptimeSeconds int64   `json:"uptimeSeconds"`
 }
 
 type HeartbeatAckPayload struct {

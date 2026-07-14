@@ -12,6 +12,7 @@ export function createRegisterServer(repo: Repository) {
       ...input,
       labels: input.labels ?? {},
       status: "offline",
+      lastHeartbeatAt: null,
       createdAt: now,
       updatedAt: now,
     };

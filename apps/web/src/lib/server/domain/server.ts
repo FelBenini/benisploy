@@ -18,6 +18,7 @@ export const ServerSchema = z.object({
     .record(z.string(), z.string())
     .default({})
     .describe("Arbitrary key/value metadata"),
+  lastHeartbeatAt: z.string().datetime().nullable().optional(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 });
