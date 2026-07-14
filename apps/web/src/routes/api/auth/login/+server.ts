@@ -40,7 +40,7 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
     return json({ error: "Invalid email or password" }, { status: 401 });
   }
 
-  const session = await app.auth.createSession(result.user.id);
+  const session = await app.auth.createSession(app.db, result.user.id);
 
   cookies.set(SESSION_COOKIE, session.token, {
     path: "/",

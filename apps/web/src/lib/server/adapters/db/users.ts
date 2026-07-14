@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import type { UserRepository } from "../../ports/repository";
+import type { DbExecutor, UserRepository } from "../../ports/repository";
 import type { User } from "../../domain/user";
 import type { DrizzleDB } from "./drizzle-repository";
 import { users } from "../../db/schema";
@@ -16,11 +16,12 @@ export class DrizzleUserRepository implements UserRepository {
   constructor(private db: DrizzleDB) {}
 
   async create(
+    db: DbExecutor,
     orgId: string,
     user: User,
     passwordHash?: string,
   ): Promise<User> {
-    const [row] = await this.db
+    const [row] = await (db
       .insert(users)
       .values({
         id: user.id,
@@ -29,7 +30,7 @@ export class DrizzleUserRepository implements UserRepository {
         createdAt: new Date(user.createdAt),
         updatedAt: new Date(),
       })
-      .returning();
+      .returning() as Promise<(typeof users.$inferSelect)[]>);
     return toDomain(row);
   }
 

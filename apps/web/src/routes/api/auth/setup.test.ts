@@ -1,25 +1,27 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { RequestEvent } from "./setup/$types";
 
-let mockIsConfigured: ReturnType<typeof vi.fn>;
-let mockMarkAsConfigured: ReturnType<typeof vi.fn>;
+let mockTryAcquire: ReturnType<typeof vi.fn>;
 let mockOrgCreate: ReturnType<typeof vi.fn>;
 let mockUserCreate: ReturnType<typeof vi.fn>;
 let mockMembershipCreate: ReturnType<typeof vi.fn>;
 let mockCreateSession: ReturnType<typeof vi.fn>;
 let mockHashPassword: ReturnType<typeof vi.fn>;
+let mockTransaction: ReturnType<typeof vi.fn>;
 
 vi.mock("$lib/server/app", () => {
-  mockIsConfigured = vi.fn();
-  mockMarkAsConfigured = vi.fn();
+  mockTryAcquire = vi.fn();
   mockOrgCreate = vi.fn();
   mockUserCreate = vi.fn();
   mockMembershipCreate = vi.fn();
   mockCreateSession = vi.fn();
   mockHashPassword = vi.fn();
+  mockTransaction = vi.fn();
   return {
     app: {
+      db: { transaction: mockTransaction },
       repo: {
+        systemSetup: { tryAcquire: mockTryAcquire },
         orgs: { create: mockOrgCreate },
         users: { create: mockUserCreate },
         memberships: { create: mockMembershipCreate },
@@ -28,10 +30,7 @@ vi.mock("$lib/server/app", () => {
         createSession: mockCreateSession,
         hashPassword: mockHashPassword,
       },
-      systemSetup: {
-        isConfigured: mockIsConfigured,
-        markAsConfigured: mockMarkAsConfigured,
-      },
+      systemSetup: { isConfigured: vi.fn(), tryAcquire: mockTryAcquire },
     },
   };
 });
@@ -66,7 +65,11 @@ describe("POST /api/auth/setup", () => {
   });
 
   it("returns 400 when system is already configured", async () => {
-    mockIsConfigured.mockResolvedValue(true);
+    mockTransaction.mockImplementation(async (fn: (tx: unknown) => unknown) =>
+      fn({}),
+    );
+    mockTryAcquire.mockResolvedValue(false);
+
     const event = createRequestEvent({
       email: "admin@test.com",
       password: "password123",
@@ -79,7 +82,10 @@ describe("POST /api/auth/setup", () => {
   });
 
   it("returns 200 with user data on first setup", async () => {
-    mockIsConfigured.mockResolvedValue(false);
+    mockTransaction.mockImplementation(async (fn: (tx: unknown) => unknown) =>
+      fn({}),
+    );
+    mockTryAcquire.mockResolvedValue(true);
     mockOrgCreate.mockResolvedValue({});
     mockUserCreate.mockResolvedValue({});
     mockMembershipCreate.mockResolvedValue({});
@@ -98,7 +104,6 @@ describe("POST /api/auth/setup", () => {
   });
 
   it("returns 400 for invalid email", async () => {
-    mockIsConfigured.mockResolvedValue(false);
     const event = createRequestEvent({
       email: "not-email",
       password: "password123",
@@ -109,7 +114,6 @@ describe("POST /api/auth/setup", () => {
   });
 
   it("returns 400 for short password", async () => {
-    mockIsConfigured.mockResolvedValue(false);
     const event = createRequestEvent({
       email: "admin@test.com",
       password: "1234567",
@@ -120,7 +124,6 @@ describe("POST /api/auth/setup", () => {
   });
 
   it("returns 400 for non-JSON body", async () => {
-    mockIsConfigured.mockResolvedValue(false);
     const event = {
       request: new Request("http://localhost:5173/api/auth/setup", {
         method: "POST",
@@ -146,8 +149,12 @@ describe("POST /api/auth/setup", () => {
     expect(body.error).toBe("Invalid JSON body");
   });
 
-  it("creates org, user, and membership on successful setup", async () => {
-    mockIsConfigured.mockResolvedValue(false);
+  it("creates org, user, and membership inside the transaction", async () => {
+    const fakeTx = {};
+    mockTransaction.mockImplementation(async (fn: (tx: unknown) => unknown) =>
+      fn(fakeTx),
+    );
+    mockTryAcquire.mockResolvedValue(true);
     mockOrgCreate.mockResolvedValue({});
     mockUserCreate.mockResolvedValue({});
     mockMembershipCreate.mockResolvedValue({});
@@ -159,37 +166,44 @@ describe("POST /api/auth/setup", () => {
     });
     await POST(event);
 
+    expect(mockTryAcquire).toHaveBeenCalledWith(fakeTx);
     expect(mockOrgCreate).toHaveBeenCalledWith(
+      fakeTx,
       expect.objectContaining({ name: "Default", slug: "default" }),
     );
     expect(mockUserCreate).toHaveBeenCalledWith(
+      fakeTx,
       expect.any(String),
       expect.objectContaining({ email: "admin@test.com" }),
       expect.any(String),
     );
     expect(mockMembershipCreate).toHaveBeenCalledWith(
+      fakeTx,
       expect.objectContaining({ role: "admin" }),
     );
   });
 
-  it("calls markAsConfigured on successful setup", async () => {
-    mockIsConfigured.mockResolvedValue(false);
-    mockOrgCreate.mockResolvedValue({});
-    mockUserCreate.mockResolvedValue({});
-    mockMembershipCreate.mockResolvedValue({});
-    mockCreateSession.mockResolvedValue({ token: "session-id.secret" });
+  it("rolls back and returns 400 on concurrent setup", async () => {
+    mockTransaction.mockImplementation(async (fn: (tx: unknown) => unknown) =>
+      fn({}),
+    );
+    mockTryAcquire.mockResolvedValue(false);
 
     const event = createRequestEvent({
       email: "admin@test.com",
       password: "password123",
     });
-    await POST(event);
+    const response = await POST(event);
 
-    expect(mockMarkAsConfigured).toHaveBeenCalled();
+    expect(response.status).toBe(400);
+    expect(mockOrgCreate).not.toHaveBeenCalled();
   });
 
   it("sets session cookie on successful setup", async () => {
-    mockIsConfigured.mockResolvedValue(false);
+    mockTransaction.mockImplementation(async (fn: (tx: unknown) => unknown) =>
+      fn({}),
+    );
+    mockTryAcquire.mockResolvedValue(true);
     mockOrgCreate.mockResolvedValue({});
     mockUserCreate.mockResolvedValue({});
     mockMembershipCreate.mockResolvedValue({});

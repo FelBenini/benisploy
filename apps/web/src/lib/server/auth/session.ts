@@ -1,5 +1,5 @@
 import type { Session, SessionWithToken } from "../domain/session";
-import type { SessionRepository } from "../ports/repository";
+import type { DbExecutor, SessionRepository } from "../ports/repository";
 
 export const SESSION_EXPIRES_IN_SECONDS = 60 * 60 * 24; // 1 day
 export const SESSION_COOKIE = "session_token";
@@ -53,6 +53,7 @@ export function constantTimeEqual(a: Uint8Array, b: Uint8Array): boolean {
 }
 
 export async function createSession(
+  db: DbExecutor,
   sessionRepo: SessionRepository,
   userId: string,
 ): Promise<SessionWithToken> {
@@ -70,7 +71,7 @@ export async function createSession(
     expiresAt: new Date(now.getTime() + SESSION_EXPIRES_IN_SECONDS * 1000),
   };
 
-  await sessionRepo.create(session);
+  await sessionRepo.create(db, session);
 
   return { ...session, token };
 }

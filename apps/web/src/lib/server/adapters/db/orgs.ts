@@ -1,4 +1,4 @@
-import type { OrgRepository } from "../../ports/repository";
+import type { DbExecutor, OrgRepository } from "../../ports/repository";
 import type { Org } from "../../domain/org";
 import type { DrizzleDB } from "./drizzle-repository";
 import { orgs } from "../../db/schema";
@@ -16,8 +16,8 @@ function toDomain(row: typeof orgs.$inferSelect): Org {
 export class DrizzleOrgRepository implements OrgRepository {
   constructor(private db: DrizzleDB) {}
 
-  async create(org: Org): Promise<Org> {
-    const [row] = await this.db
+  async create(db: DbExecutor, org: Org): Promise<Org> {
+    const [row] = await (db
       .insert(orgs)
       .values({
         id: org.id,
@@ -26,7 +26,7 @@ export class DrizzleOrgRepository implements OrgRepository {
         createdAt: org.createdAt,
         updatedAt: org.updatedAt,
       })
-      .returning();
+      .returning() as Promise<(typeof orgs.$inferSelect)[]>);
     return toDomain(row);
   }
 }

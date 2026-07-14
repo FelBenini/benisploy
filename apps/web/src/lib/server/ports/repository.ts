@@ -6,6 +6,24 @@ import type { Session } from "../domain/session";
 import type { Server, CreateServerInput } from "../domain/server";
 import type { User } from "../domain/user";
 
+export interface DbExecutor {
+  insert(table: unknown): {
+    values(data: unknown): {
+      onConflictDoNothing(): {
+        returning(fields?: unknown): Promise<unknown[]>;
+      };
+      returning(fields?: unknown): Promise<unknown[]>;
+    };
+  };
+  update(table: unknown): {
+    set(data: unknown): {
+      where(condition: unknown): {
+        returning(fields?: unknown): Promise<unknown[]>;
+      };
+    };
+  };
+}
+
 export interface ServerRepository {
   create(
     orgId: string,
@@ -37,7 +55,12 @@ export interface DeploymentRepository {
 }
 
 export interface UserRepository {
-  create(orgId: string, user: User, passwordHash?: string): Promise<User>;
+  create(
+    db: DbExecutor,
+    orgId: string,
+    user: User,
+    passwordHash?: string,
+  ): Promise<User>;
   get(orgId: string, id: string): Promise<User | null>;
   getByEmail(orgId: string, email: string): Promise<User | null>;
   getPasswordHashByEmail(
@@ -46,16 +69,16 @@ export interface UserRepository {
 }
 
 export interface OrgRepository {
-  create(org: Org): Promise<Org>;
+  create(db: DbExecutor, org: Org): Promise<Org>;
 }
 
 export interface OrgMembershipRepository {
-  create(membership: OrgMembership): Promise<OrgMembership>;
+  create(db: DbExecutor, membership: OrgMembership): Promise<OrgMembership>;
   findByUserId(userId: string): Promise<OrgMembership | null>;
 }
 
 export interface SessionRepository {
-  create(session: Session): Promise<Session>;
+  create(db: DbExecutor, session: Session): Promise<Session>;
   get(id: string): Promise<Session | null>;
   delete(id: string): Promise<void>;
   deleteAllForUser(userId: string): Promise<void>;
@@ -63,7 +86,7 @@ export interface SessionRepository {
 
 export interface SystemSetupRepository {
   isConfigured(): Promise<boolean>;
-  markAsConfigured(): Promise<void>;
+  tryAcquire(db: DbExecutor): Promise<boolean>;
 }
 
 export interface Repository {

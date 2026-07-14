@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { InMemoryRepository } from "../usecase/test-utils";
+import type { DbExecutor } from "../ports/repository";
 import {
   generateSecureRandomString,
   generateSessionToken,
@@ -12,6 +13,18 @@ import {
   verifyRequestOrigin,
   SESSION_EXPIRES_IN_SECONDS,
 } from "./session";
+
+const mockDb: DbExecutor = {
+  insert: () => ({
+    values: () => ({
+      returning: async () => [],
+      onConflictDoNothing: () => ({ returning: async () => [] }),
+    }),
+  }),
+  update: () => ({
+    set: () => ({ where: () => ({ returning: async () => [] }) }),
+  }),
+};
 
 describe("generateSecureRandomString", () => {
   it("returns a string of the expected length", () => {
@@ -111,7 +124,7 @@ describe("constantTimeEqual", () => {
 describe("createSession", () => {
   it("creates a session and returns a token", async () => {
     const repo = new InMemoryRepository();
-    const result = await createSession(repo.sessions, "user-1");
+    const result = await createSession(mockDb, repo.sessions, "user-1");
 
     expect(result.id).toHaveLength(24);
     expect(result.userId).toBe("user-1");
@@ -129,7 +142,7 @@ describe("createSession", () => {
 
   it("persists the session in the repository", async () => {
     const repo = new InMemoryRepository();
-    const result = await createSession(repo.sessions, "user-1");
+    const result = await createSession(mockDb, repo.sessions, "user-1");
 
     const stored = await repo.sessions.get(result.id);
     expect(stored).not.toBeNull();
@@ -142,7 +155,7 @@ describe("createSession", () => {
 describe("validateSessionToken", () => {
   it("returns the session for a valid token", async () => {
     const repo = new InMemoryRepository();
-    const created = await createSession(repo.sessions, "user-1");
+    const created = await createSession(mockDb, repo.sessions, "user-1");
 
     const session = await validateSessionToken(repo.sessions, created.token);
     expect(session).not.toBeNull();
@@ -163,7 +176,7 @@ describe("validateSessionToken", () => {
 
   it("returns null when the secret does not match", async () => {
     const repo = new InMemoryRepository();
-    const result = await createSession(repo.sessions, "user-1");
+    const result = await createSession(mockDb, repo.sessions, "user-1");
     const wrongToken = `${result.id}.wrong-secret`;
 
     expect(await validateSessionToken(repo.sessions, wrongToken)).toBeNull();
@@ -171,11 +184,11 @@ describe("validateSessionToken", () => {
 
   it("deletes expired sessions and returns null", async () => {
     const repo = new InMemoryRepository();
-    const result = await createSession(repo.sessions, "user-1");
+    const result = await createSession(mockDb, repo.sessions, "user-1");
 
     // Manually expire the session
     const expired = await repo.sessions.get(result.id);
-    await repo.sessions.create({
+    await repo.sessions.create(mockDb, {
       ...expired!,
       expiresAt: new Date(Date.now() - 1000),
     });
@@ -188,7 +201,7 @@ describe("validateSessionToken", () => {
 describe("deleteSession", () => {
   it("removes the session from the repository", async () => {
     const repo = new InMemoryRepository();
-    const result = await createSession(repo.sessions, "user-1");
+    const result = await createSession(mockDb, repo.sessions, "user-1");
 
     await deleteSession(repo.sessions, result.id);
     expect(await repo.sessions.get(result.id)).toBeNull();

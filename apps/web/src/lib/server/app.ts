@@ -1,4 +1,5 @@
 import { db } from "$lib/server/db/client";
+import type { DbExecutor } from "$lib/server/ports/repository";
 import { DrizzleRepository } from "$lib/server/adapters/db/drizzle-repository";
 import { NopNodeAgentClient } from "$lib/server/adapters/node-agent/nop";
 import { createRegisterServer } from "$lib/server/usecase/register-server";
@@ -16,6 +17,7 @@ const repo = new DrizzleRepository(db);
 const nodeAgent = new NopNodeAgentClient();
 
 export const app = {
+  db,
   repo,
   useCases: {
     registerServer: createRegisterServer(repo),
@@ -24,7 +26,8 @@ export const app = {
     getApp: createGetApp(repo),
   },
   auth: {
-    createSession: (userId: string) => createSession(repo.sessions, userId),
+    createSession: (executor: DbExecutor, userId: string) =>
+      createSession(executor, repo.sessions, userId),
     validateSessionToken: (token: string) =>
       validateSessionToken(repo.sessions, token),
     deleteSession: (sessionId: string) =>

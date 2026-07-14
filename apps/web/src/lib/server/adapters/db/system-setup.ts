@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import type { SystemSetupRepository } from "../../ports/repository";
+import type { DbExecutor, SystemSetupRepository } from "../../ports/repository";
 import type { DrizzleDB } from "./drizzle-repository";
 import { systemSetup } from "../../db/schema";
 
@@ -12,16 +12,15 @@ export class DrizzleSystemSetupRepository implements SystemSetupRepository {
       .from(systemSetup)
       .where(eq(systemSetup.id, 1))
       .limit(1);
-    return row?.configured ?? false;
+    return row !== undefined;
   }
 
-  async markAsConfigured(): Promise<void> {
-    await this.db
+  async tryAcquire(db: DbExecutor): Promise<boolean> {
+    const result = await (db
       .insert(systemSetup)
-      .values({ id: 1, configured: true, setupAt: new Date() })
-      .onConflictDoUpdate({
-        target: systemSetup.id,
-        set: { configured: true, setupAt: new Date() },
-      });
+      .values({ id: 1, setupAt: new Date() })
+      .onConflictDoNothing()
+      .returning({ id: systemSetup.id }) as Promise<{ id: number }[]>);
+    return result.length === 1;
   }
 }

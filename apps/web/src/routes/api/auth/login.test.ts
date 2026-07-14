@@ -13,6 +13,7 @@ vi.mock("$lib/server/app", () => {
   mockCreateSession = vi.fn();
   return {
     app: {
+      db: {},
       repo: { users: { getPasswordHashByEmail: mockGetPasswordHashByEmail } },
       auth: {
         createSession: mockCreateSession,

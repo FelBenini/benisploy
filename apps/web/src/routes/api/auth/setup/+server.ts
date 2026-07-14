@@ -3,6 +3,7 @@ import type { RequestHandler } from "./$types";
 import { z } from "zod";
 import { createId } from "@paralleldrive/cuid2";
 import { app } from "$lib/server/app";
+import type { DbExecutor } from "$lib/server/ports/repository";
 import {
   SESSION_COOKIE,
   SESSION_EXPIRES_IN_SECONDS,
@@ -14,11 +15,6 @@ const SetupSchema = z.object({
 });
 
 export const POST: RequestHandler = async ({ request, cookies }) => {
-  const configured = await app.systemSetup.isConfigured();
-  if (configured) {
-    return json({ error: "System is already configured" }, { status: 400 });
-  }
-
   let body: unknown;
   try {
     body = await request.json();
@@ -36,49 +32,66 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
 
   const { email, password } = parsed.data;
 
-  const orgId = createId();
-  const userId = createId();
-  const now = new Date();
-  const passwordHash = await app.auth.hashPassword(password);
+  try {
+    const result = await app.db.transaction(async (tx: DbExecutor) => {
+      const acquired = await app.repo.systemSetup.tryAcquire(tx);
 
-  await app.repo.orgs.create({
-    id: orgId,
-    name: "Default",
-    slug: "default",
-    createdAt: now,
-    updatedAt: now,
-  });
+      if (!acquired) {
+        throw new Error("ALREADY_CONFIGURED");
+      }
 
-  await app.repo.users.create(
-    orgId,
-    {
-      id: userId,
-      email,
-      createdAt: now.toISOString(),
-    },
-    passwordHash,
-  );
+      const orgId = createId();
+      const userId = createId();
+      const now = new Date();
+      const passwordHash = await app.auth.hashPassword(password);
 
-  await app.repo.memberships.create({
-    userId,
-    orgId,
-    role: "admin",
-    createdAt: now,
-  });
+      await app.repo.orgs.create(tx, {
+        id: orgId,
+        name: "Default",
+        slug: "default",
+        createdAt: now,
+        updatedAt: now,
+      });
 
-  const session = await app.auth.createSession(userId);
+      await app.repo.users.create(
+        tx,
+        orgId,
+        {
+          id: userId,
+          email,
+          createdAt: now.toISOString(),
+        },
+        passwordHash,
+      );
 
-  await app.systemSetup.markAsConfigured();
+      await app.repo.memberships.create(tx, {
+        userId,
+        orgId,
+        role: "admin",
+        createdAt: now,
+      });
 
-  cookies.set(SESSION_COOKIE, session.token, {
-    path: "/",
-    httpOnly: true,
-    secure: true,
-    sameSite: "lax",
-    maxAge: SESSION_EXPIRES_IN_SECONDS,
-  });
+      const session = await app.auth.createSession(tx, userId);
 
-  return json({
-    user: { id: userId, email },
-  });
+      return {
+        session,
+        user: { id: userId, email },
+      };
+    });
+
+    cookies.set(SESSION_COOKIE, result.session.token, {
+      path: "/",
+      httpOnly: true,
+      secure: true,
+      sameSite: "lax",
+      maxAge: SESSION_EXPIRES_IN_SECONDS,
+    });
+
+    return json({ user: result.user });
+  } catch (err) {
+    if (err instanceof Error && err.message === "ALREADY_CONFIGURED") {
+      return json({ error: "System is already configured" }, { status: 400 });
+    }
+    throw err;
+  }
 };

@@ -8,6 +8,7 @@ import type {
   SystemSetupRepository,
   OrgRepository,
   OrgMembershipRepository,
+  DbExecutor,
 } from "../ports/repository";
 import type { NodeAgentClient, LogEntry } from "../ports/node-agent-client";
 import type { App } from "../domain/app";
@@ -147,6 +148,7 @@ class InMemoryUserRepo implements UserRepository {
   passwordHashes = new Map<string, string>();
 
   async create(
+    _db: DbExecutor,
     orgId: string,
     user: User,
     passwordHash?: string,
@@ -185,7 +187,7 @@ class InMemoryUserRepo implements UserRepository {
 class InMemorySessionRepo implements SessionRepository {
   items = new Map<string, Session>();
 
-  async create(session: Session): Promise<Session> {
+  async create(_db: DbExecutor, session: Session): Promise<Session> {
     this.items.set(session.id, { ...session });
     return session;
   }
@@ -215,15 +217,17 @@ class InMemorySystemSetupRepo implements SystemSetupRepository {
     return this.configured;
   }
 
-  async markAsConfigured(): Promise<void> {
+  async tryAcquire(_db: DbExecutor): Promise<boolean> {
+    if (this.configured) return false;
     this.configured = true;
+    return true;
   }
 }
 
 class InMemoryOrgRepo implements OrgRepository {
   items = new Map<string, Org>();
 
-  async create(org: Org): Promise<Org> {
+  async create(_db: DbExecutor, org: Org): Promise<Org> {
     this.items.set(org.id, { ...org });
     return org;
   }
@@ -232,7 +236,10 @@ class InMemoryOrgRepo implements OrgRepository {
 class InMemoryMembershipRepo implements OrgMembershipRepository {
   items: OrgMembership[] = [];
 
-  async create(membership: OrgMembership): Promise<OrgMembership> {
+  async create(
+    _db: DbExecutor,
+    membership: OrgMembership,
+  ): Promise<OrgMembership> {
     this.items.push({ ...membership });
     return membership;
   }

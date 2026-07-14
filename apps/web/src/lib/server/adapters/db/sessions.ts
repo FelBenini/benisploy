@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import type { SessionRepository } from "../../ports/repository";
+import type { DbExecutor, SessionRepository } from "../../ports/repository";
 import type { Session } from "../../domain/session";
 import type { DrizzleDB } from "./drizzle-repository";
 import { sessions } from "../../db/schema";
@@ -17,8 +17,8 @@ function toDomain(row: typeof sessions.$inferSelect): Session {
 export class DrizzleSessionRepository implements SessionRepository {
   constructor(private db: DrizzleDB) {}
 
-  async create(session: Session): Promise<Session> {
-    const [row] = await this.db
+  async create(db: DbExecutor, session: Session): Promise<Session> {
+    const [row] = await (db
       .insert(sessions)
       .values({
         id: session.id,
@@ -27,7 +27,7 @@ export class DrizzleSessionRepository implements SessionRepository {
         createdAt: session.createdAt,
         expiresAt: session.expiresAt,
       })
-      .returning();
+      .returning() as Promise<(typeof sessions.$inferSelect)[]>);
     return toDomain(row);
   }
 
