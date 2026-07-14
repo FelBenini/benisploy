@@ -4,10 +4,18 @@ import type {
   AppRepository,
   DeploymentRepository,
   UserRepository,
+  SessionRepository,
+  SystemSetupRepository,
+  OrgRepository,
+  OrgMembershipRepository,
+  DbExecutor,
 } from "../ports/repository";
 import type { NodeAgentClient, LogEntry } from "../ports/node-agent-client";
 import type { App } from "../domain/app";
 import type { Deployment } from "../domain/deployment";
+import type { Session } from "../domain/session";
+import type { Org } from "../domain/org";
+import type { OrgMembership } from "../domain/org-membership";
 import type { Server, ServerStatusReport } from "../domain/server";
 import type { User } from "../domain/user";
 import type { AppSpec } from "../domain/app-spec";
@@ -137,9 +145,18 @@ class InMemoryDeploymentRepo implements DeploymentRepository {
 
 class InMemoryUserRepo implements UserRepository {
   items = new Map<string, { data: User; orgId: string }>();
+  passwordHashes = new Map<string, string>();
 
-  async create(orgId: string, user: User): Promise<User> {
+  async create(
+    _db: DbExecutor,
+    orgId: string,
+    user: User,
+    passwordHash?: string,
+  ): Promise<User> {
     this.items.set(user.id, { data: user, orgId });
+    if (passwordHash) {
+      this.passwordHashes.set(user.id, passwordHash);
+    }
     return user;
   }
 
@@ -154,6 +171,82 @@ class InMemoryUserRepo implements UserRepository {
     );
     return entry && entry.orgId === orgId ? entry.data : null;
   }
+
+  async getPasswordHashByEmail(
+    email: string,
+  ): Promise<{ user: User; passwordHash: string } | null> {
+    const entry = Array.from(this.items.values()).find(
+      (e) => e.data.email === email,
+    );
+    if (!entry) return null;
+    const hash = this.passwordHashes.get(entry.data.id) ?? "";
+    return { user: entry.data, passwordHash: hash };
+  }
+}
+
+class InMemorySessionRepo implements SessionRepository {
+  items = new Map<string, Session>();
+
+  async create(_db: DbExecutor, session: Session): Promise<Session> {
+    this.items.set(session.id, { ...session });
+    return session;
+  }
+
+  async get(id: string): Promise<Session | null> {
+    const entry = this.items.get(id);
+    return entry ? { ...entry } : null;
+  }
+
+  async delete(id: string): Promise<void> {
+    this.items.delete(id);
+  }
+
+  async deleteAllForUser(userId: string): Promise<void> {
+    for (const [id, session] of this.items) {
+      if (session.userId === userId) {
+        this.items.delete(id);
+      }
+    }
+  }
+}
+
+class InMemorySystemSetupRepo implements SystemSetupRepository {
+  configured = false;
+
+  async isConfigured(): Promise<boolean> {
+    return this.configured;
+  }
+
+  async tryAcquire(_db: DbExecutor): Promise<boolean> {
+    if (this.configured) return false;
+    this.configured = true;
+    return true;
+  }
+}
+
+class InMemoryOrgRepo implements OrgRepository {
+  items = new Map<string, Org>();
+
+  async create(_db: DbExecutor, org: Org): Promise<Org> {
+    this.items.set(org.id, { ...org });
+    return org;
+  }
+}
+
+class InMemoryMembershipRepo implements OrgMembershipRepository {
+  items: OrgMembership[] = [];
+
+  async create(
+    _db: DbExecutor,
+    membership: OrgMembership,
+  ): Promise<OrgMembership> {
+    this.items.push({ ...membership });
+    return membership;
+  }
+
+  async findByUserId(userId: string): Promise<OrgMembership | null> {
+    return this.items.find((m) => m.userId === userId) ?? null;
+  }
 }
 
 export class InMemoryRepository implements Repository {
@@ -161,12 +254,20 @@ export class InMemoryRepository implements Repository {
   apps: InMemoryAppRepo;
   deployments: InMemoryDeploymentRepo;
   users: InMemoryUserRepo;
+  sessions: InMemorySessionRepo;
+  systemSetup: InMemorySystemSetupRepo;
+  orgs: InMemoryOrgRepo;
+  memberships: InMemoryMembershipRepo;
 
   constructor() {
     this.apps = new InMemoryAppRepo();
     this.servers = new InMemoryServerRepo();
     this.deployments = new InMemoryDeploymentRepo(this.apps);
     this.users = new InMemoryUserRepo();
+    this.sessions = new InMemorySessionRepo();
+    this.systemSetup = new InMemorySystemSetupRepo();
+    this.orgs = new InMemoryOrgRepo();
+    this.memberships = new InMemoryMembershipRepo();
   }
 }
 

@@ -70,6 +70,20 @@ CREATE TABLE "servers" (
 	"updatedAt" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "sessions" (
+	"id" text PRIMARY KEY NOT NULL,
+	"user_id" text NOT NULL,
+	"secret_hash" "bytea" NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"expires_at" timestamp with time zone NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE "system_setup" (
+	"id" integer PRIMARY KEY DEFAULT 1 NOT NULL,
+	"configured" boolean DEFAULT true NOT NULL,
+	"setup_at" timestamp with time zone
+);
+--> statement-breakpoint
 CREATE TABLE "users" (
 	"id" text PRIMARY KEY NOT NULL,
 	"email" text NOT NULL,
@@ -89,6 +103,7 @@ ALTER TABLE "env_vars" ADD CONSTRAINT "env_vars_appId_apps_id_fk" FOREIGN KEY ("
 ALTER TABLE "memberships" ADD CONSTRAINT "memberships_userId_users_id_fk" FOREIGN KEY ("userId") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "memberships" ADD CONSTRAINT "memberships_orgId_orgs_id_fk" FOREIGN KEY ("orgId") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "servers" ADD CONSTRAINT "servers_orgId_orgs_id_fk" FOREIGN KEY ("orgId") REFERENCES "public"."orgs"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "sessions" ADD CONSTRAINT "sessions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "apps_org_idx" ON "apps" USING btree ("orgId");--> statement-breakpoint
 CREATE INDEX "apps_server_idx" ON "apps" USING btree ("serverId");--> statement-breakpoint
 CREATE INDEX "apps_org_status_idx" ON "apps" USING btree ("orgId","status");--> statement-breakpoint
@@ -113,4 +128,6 @@ CREATE INDEX "orgs_created_idx" ON "orgs" USING btree ("createdAt");--> statemen
 CREATE INDEX "servers_org_idx" ON "servers" USING btree ("orgId");--> statement-breakpoint
 CREATE INDEX "servers_org_status_idx" ON "servers" USING btree ("orgId","status");--> statement-breakpoint
 CREATE INDEX "servers_org_name_idx" ON "servers" USING btree ("orgId","name");--> statement-breakpoint
+CREATE INDEX "sessions_user_idx" ON "sessions" USING btree ("user_id");--> statement-breakpoint
+CREATE INDEX "sessions_expires_idx" ON "sessions" USING btree ("expires_at");--> statement-breakpoint
 CREATE INDEX "users_email_idx" ON "users" USING btree ("email");
