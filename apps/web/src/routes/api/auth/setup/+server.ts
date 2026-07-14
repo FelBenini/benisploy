@@ -30,8 +30,9 @@ export const POST: RequestHandler = async ({ request, cookies }) => {
     );
   }
 
-  const { email, password } = parsed.data;
+  const { password } = parsed.data;
 
+  const email = parsed.data.email.toLowerCase();
   try {
     const result = await app.db.transaction(async (tx: DbExecutor) => {
       const acquired = await app.repo.systemSetup.tryAcquire(tx);
