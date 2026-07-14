@@ -1,0 +1,143 @@
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { WebSocket, WebSocketServer as WsServer } from "ws";
+import { NodeAgentWsServer } from "./node-agent-ws-server";
+
+const serverStore = new Map<string, { orgId: string; server: Record<string, unknown> }>();
+
+const inMemRepo = {
+  servers: {
+    async getByIdAny(id: string) {
+      const entry = serverStore.get(id);
+      if (!entry) return null;
+      return { ...entry.server, orgId: entry.orgId } as any;
+    },
+    async updateHeartbeat(_orgId: string, id: string) {
+      const entry = serverStore.get(id);
+      if (entry) {
+        entry.server.lastHeartbeatAt = new Date().toISOString();
+        entry.server.status = "online";
+      }
+    },
+  },
+};
+
+function waitForMessage(ws: WebSocket, timeout = 3000): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error("timeout")), timeout);
+    ws.once("message", (data) => {
+      clearTimeout(timer);
+      resolve(JSON.parse(data.toString()));
+    });
+  });
+}
+
+describe("NodeAgentWsServer", () => {
+  let server: NodeAgentWsServer;
+  let port: number;
+
+  beforeEach(() => {
+    serverStore.clear();
+    serverStore.set("srv-1", {
+      orgId: "org-1",
+      server: { id: "srv-1", name: "test", status: "offline", memoryBytes: 8_000_000_000, diskBytes: 100_000_000_000 },
+    });
+
+    server = new NodeAgentWsServer(inMemRepo as any, 0);
+    port = server.port;
+  });
+
+  afterEach(() => {
+    server.close();
+  });
+
+  it("accepts a connection and registers on heartbeat", async () => {
+    const ws = new WebSocket(`ws://127.0.0.1:${port}`);
+    await new Promise<void>((resolve) => ws.once("open", resolve));
+
+    ws.send(
+      JSON.stringify({
+        type: "heartbeat",
+        id: "hb-1",
+        timestamp: new Date().toISOString(),
+        payload: {
+          serverId: "srv-1",
+          hostname: "box1",
+          cpuPercent: 23.5,
+          memoryUsed: 2_000_000_000,
+          memoryTotal: 8_000_000_000,
+          diskUsed: 40_000_000_000,
+          diskTotal: 100_000_000_000,
+          uptimeSeconds: 3600,
+        },
+      }),
+    );
+
+    const ack = await waitForMessage(ws);
+    expect(ack.type).toBe("heartbeat_ack");
+    expect(ack.payload.timestamp).toBeDefined();
+
+    const entry = serverStore.get("srv-1")!;
+    expect(entry.server.status).toBe("online");
+    expect(entry.server.lastHeartbeatAt).toBeDefined();
+
+    ws.close();
+  });
+
+  it("getStatus returns live data from agent", async () => {
+    const ws = new WebSocket(`ws://127.0.0.1:${port}`);
+    await new Promise<void>((resolve) => ws.once("open", resolve));
+
+    // Register via heartbeat first
+    ws.send(
+      JSON.stringify({
+        type: "heartbeat",
+        id: "hb-1",
+        timestamp: new Date().toISOString(),
+        payload: {
+          serverId: "srv-1",
+          hostname: "box1",
+          cpuPercent: 10,
+          memoryUsed: 1_000_000_000,
+          memoryTotal: 8_000_000_000,
+          diskUsed: 20_000_000_000,
+          diskTotal: 100_000_000_000,
+          uptimeSeconds: 100,
+        },
+      }),
+    );
+    await waitForMessage(ws); // consume ack
+
+    // Send getStatus to the server (simulate agent responding)
+    const statusPromise = server.getStatus("srv-1");
+
+    // Agent receives get_status, must respond with status_response
+    const req = await waitForMessage(ws);
+    expect(req.type).toBe("get_status");
+
+    // Agent responds
+    ws.send(
+      JSON.stringify({
+        type: "status_response",
+        id: req.id,
+        timestamp: new Date().toISOString(),
+        payload: {
+          cpuPercent: 45.2,
+          memoryUsed: 4_000_000_000,
+          memoryTotal: 8_000_000_000,
+          diskUsed: 50_000_000_000,
+          diskTotal: 100_000_000_000,
+          containers: [{ id: "c1", name: "web", image: "nginx", state: "running", portMappings: [] }],
+          uptimeSeconds: 3600,
+        },
+      }),
+    );
+
+    const status = await statusPromise;
+    expect(status.cpuPercent).toBe(45.2);
+    expect(status.memoryUsed).toBe(4_000_000_000);
+    expect(status.memoryTotal).toBe(8_000_000_000);
+    expect(status.containerCount).toBe(1);
+
+    ws.close();
+  });
+});

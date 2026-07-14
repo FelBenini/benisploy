@@ -1,5 +1,5 @@
 import { eq, and } from "drizzle-orm";
-import type { ServerRepository } from "../../ports/repository";
+import type { ServerRepository, ServerWithOrg } from "../../ports/repository";
 import type { Server } from "../../domain/server";
 import type { DrizzleDB } from "./drizzle-repository";
 import { servers } from "../../db/schema";
@@ -14,6 +14,7 @@ function toDomain(row: typeof servers.$inferSelect): Server {
     memoryBytes: row.memoryBytes,
     diskBytes: row.diskBytes,
     labels: row.labels as Record<string, string>,
+    lastHeartbeatAt: row.lastHeartbeatAt?.toISOString() ?? null,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   };
@@ -51,6 +52,16 @@ export class DrizzleServerRepository implements ServerRepository {
     return row ? toDomain(row) : null;
   }
 
+  async getByIdAny(id: string): Promise<ServerWithOrg | null> {
+    const [row] = await this.db
+      .select()
+      .from(servers)
+      .where(eq(servers.id, id))
+      .limit(1);
+    if (!row) return null;
+    return { ...toDomain(row), orgId: row.orgId };
+  }
+
   async list(orgId: string): Promise<Server[]> {
     const rows = await this.db
       .select()
@@ -63,6 +74,14 @@ export class DrizzleServerRepository implements ServerRepository {
     await this.db
       .update(servers)
       .set({ status, updatedAt: new Date() })
+      .where(and(eq(servers.id, id), eq(servers.orgId, orgId)));
+  }
+
+  async updateHeartbeat(orgId: string, id: string): Promise<void> {
+    const now = new Date();
+    await this.db
+      .update(servers)
+      .set({ status: "online", lastHeartbeatAt: now, updatedAt: now })
       .where(and(eq(servers.id, id), eq(servers.orgId, orgId)));
   }
 }

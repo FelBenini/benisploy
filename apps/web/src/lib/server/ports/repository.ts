@@ -24,6 +24,10 @@ export interface DbExecutor {
   };
 }
 
+export interface ServerWithOrg extends Server {
+  orgId: string;
+}
+
 export interface ServerRepository {
   create(
     orgId: string,
@@ -35,8 +39,10 @@ export interface ServerRepository {
     },
   ): Promise<Server>;
   get(orgId: string, id: string): Promise<Server | null>;
+  getByIdAny(id: string): Promise<ServerWithOrg | null>;
   list(orgId: string): Promise<Server[]>;
   updateStatus(orgId: string, id: string, status: string): Promise<void>;
+  updateHeartbeat(orgId: string, id: string): Promise<void>;
 }
 
 export interface AppRepository {

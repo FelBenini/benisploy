@@ -137,6 +137,13 @@ export const HeartbeatSchema = MessageEnvelopeSchema.extend({
   type: z.literal("heartbeat"),
   payload: z.object({
     serverId: z.string(),
+    hostname: z.string(),
+    cpuPercent: z.number().min(0).max(100),
+    memoryUsed: z.number().nonnegative(),
+    memoryTotal: z.number().positive(),
+    diskUsed: z.number().nonnegative(),
+    diskTotal: z.number().positive(),
+    uptimeSeconds: z.number().nonnegative(),
   }),
 });
 

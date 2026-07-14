@@ -8,6 +8,13 @@
       "when": 1783987945363,
       "tag": "0000_glorious_slyde",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1784052894036,
+      "tag": "0001_rapid_william_stryker",
+      "breakpoints": true
     }
   ]
 }

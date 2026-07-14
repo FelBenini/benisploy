@@ -1,6 +1,7 @@
 import type {
   Repository,
   ServerRepository,
+  ServerWithOrg,
   AppRepository,
   DeploymentRepository,
   UserRepository,
@@ -46,6 +47,27 @@ class InMemoryServerRepo implements ServerRepository {
         data: {
           ...entry.data,
           status: status as Server["status"],
+          updatedAt: new Date().toISOString(),
+        },
+        orgId,
+      });
+    }
+  }
+
+  async getByIdAny(id: string): Promise<ServerWithOrg | null> {
+    const entry = this.items.get(id);
+    if (!entry) return null;
+    return { ...entry.data, orgId: entry.orgId };
+  }
+
+  async updateHeartbeat(orgId: string, id: string): Promise<void> {
+    const entry = this.items.get(id);
+    if (entry && entry.orgId === orgId) {
+      this.items.set(id, {
+        data: {
+          ...entry.data,
+          status: "online" as Server["status"],
+          lastHeartbeatAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         },
         orgId,

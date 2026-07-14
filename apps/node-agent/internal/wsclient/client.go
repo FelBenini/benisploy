@@ -259,7 +259,7 @@ func (c *Client) handleGetStatus(ctx context.Context, originalID string) error {
 
 	resp := protocol.Envelope{
 		Type:      protocol.TypeStatusResp,
-		ID:        c.nextID(),
+		ID:        originalID,
 		Timestamp: time.Now().UTC().Format(time.RFC3339),
 		Payload:   raw,
 	}
