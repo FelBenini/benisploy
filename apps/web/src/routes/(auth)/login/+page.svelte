@@ -1,5 +1,6 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
+  import { resolve } from "$app/paths";
   let { data } = $props();
 
   let email = $state("");
@@ -26,7 +27,7 @@
         error = body.error ?? "Something went wrong";
         return;
       }
-      goto("/");
+      goto(resolve("/"));
     } catch {
       error = "Network error";
     } finally {
