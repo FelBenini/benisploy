@@ -1,15 +1,19 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { WebSocket, WebSocketServer as WsServer } from "ws";
+import { WebSocket } from "ws";
+import type { ServerWithOrg } from "$lib/server/ports/repository";
 import { NodeAgentWsServer } from "./node-agent-ws-server";
 
-const serverStore = new Map<string, { orgId: string; server: Record<string, unknown> }>();
+const serverStore = new Map<
+  string,
+  { orgId: string; server: Record<string, unknown> }
+>();
 
 const inMemRepo = {
   servers: {
-    async getByIdAny(id: string) {
+    async getByIdAny(id: string): Promise<ServerWithOrg | null> {
       const entry = serverStore.get(id);
       if (!entry) return null;
-      return { ...entry.server, orgId: entry.orgId } as any;
+      return { ...entry.server, orgId: entry.orgId } as ServerWithOrg;
     },
     async updateHeartbeat(_orgId: string, id: string) {
       const entry = serverStore.get(id);
@@ -18,10 +22,25 @@ const inMemRepo = {
         entry.server.status = "online";
       }
     },
+    async create() {
+      throw new Error("not implemented");
+    },
+    async get() {
+      throw new Error("not implemented");
+    },
+    async list() {
+      throw new Error("not implemented");
+    },
+    async updateStatus() {
+      throw new Error("not implemented");
+    },
   },
 };
 
-function waitForMessage(ws: WebSocket, timeout = 3000): Promise<any> {
+function waitForMessage(
+  ws: WebSocket,
+  timeout = 3000,
+): Promise<Record<string, unknown>> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => reject(new Error("timeout")), timeout);
     ws.once("message", (data) => {
@@ -39,10 +58,16 @@ describe("NodeAgentWsServer", () => {
     serverStore.clear();
     serverStore.set("srv-1", {
       orgId: "org-1",
-      server: { id: "srv-1", name: "test", status: "offline", memoryBytes: 8_000_000_000, diskBytes: 100_000_000_000 },
+      server: {
+        id: "srv-1",
+        name: "test",
+        status: "offline",
+        memoryBytes: 8_000_000_000,
+        diskBytes: 100_000_000_000,
+      },
     });
 
-    server = new NodeAgentWsServer(inMemRepo as any, 0);
+    server = new NodeAgentWsServer(inMemRepo, 0);
     port = server.port;
   });
 
@@ -74,7 +99,7 @@ describe("NodeAgentWsServer", () => {
 
     const ack = await waitForMessage(ws);
     expect(ack.type).toBe("heartbeat_ack");
-    expect(ack.payload.timestamp).toBeDefined();
+    expect((ack.payload as Record<string, unknown>).timestamp).toBeDefined();
 
     const entry = serverStore.get("srv-1")!;
     expect(entry.server.status).toBe("online");
@@ -126,7 +151,15 @@ describe("NodeAgentWsServer", () => {
           memoryTotal: 8_000_000_000,
           diskUsed: 50_000_000_000,
           diskTotal: 100_000_000_000,
-          containers: [{ id: "c1", name: "web", image: "nginx", state: "running", portMappings: [] }],
+          containers: [
+            {
+              id: "c1",
+              name: "web",
+              image: "nginx",
+              state: "running",
+              portMappings: [],
+            },
+          ],
           uptimeSeconds: 3600,
         },
       }),

@@ -52,11 +52,12 @@ export class NodeAgentWsServer implements NodeAgentClient {
 
       switch (type) {
         case "heartbeat": {
+          const _prevServerId = serverId;
           const parsed = HeartbeatSchema.safeParse(obj);
           if (parsed.success) {
             serverId = parsed.data.payload.serverId;
           }
-          this.handleHeartbeat(ws, obj, serverId);
+          this.handleHeartbeat(ws, obj, _prevServerId);
           break;
         }
         case "status_response":
@@ -149,7 +150,9 @@ export class NodeAgentWsServer implements NodeAgentClient {
     serverId: string,
     type: string,
     payload: unknown,
-    responseSchema: { safeParse: (data: unknown) => { success: boolean; data?: T } },
+    responseSchema: {
+      safeParse: (data: unknown) => { success: boolean; data?: T };
+    },
   ): Promise<T> {
     const ws = this.connections.get(serverId);
     if (!ws || ws.readyState !== WebSocket.OPEN) {
@@ -209,7 +212,12 @@ export class NodeAgentWsServer implements NodeAgentClient {
     deploymentId: string,
     appSpec: AppSpec,
   ): Promise<void> {
-    await this.request(serverId, "deploy", { deploymentId, appSpec }, DeployResponseSchema);
+    await this.request(
+      serverId,
+      "deploy",
+      { deploymentId, appSpec },
+      DeployResponseSchema,
+    );
   }
 
   async streamLogs(
