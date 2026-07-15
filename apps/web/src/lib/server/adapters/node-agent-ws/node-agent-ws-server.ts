@@ -200,9 +200,7 @@ export class NodeAgentWsServer implements NodeAgentClient {
 
     const meta = this.deployMetaMap.get(deploymentId);
     if (!meta) {
-      console.error(
-        `no deploy meta for ${deploymentId}, cannot update status`,
-      );
+      console.error(`no deploy meta for ${deploymentId}, cannot update status`);
       return;
     }
     this.deployMetaMap.delete(deploymentId);
@@ -224,10 +222,7 @@ export class NodeAgentWsServer implements NodeAgentClient {
         await this.repo.apps.updateStatus(meta.orgId, meta.appId, "degraded");
       }
     } catch (err) {
-      console.error(
-        `failed to update deployment ${deploymentId} status:`,
-        err,
-      );
+      console.error(`failed to update deployment ${deploymentId} status:`, err);
     }
   }
 
@@ -441,10 +436,7 @@ export class NodeAgentWsServer implements NodeAgentClient {
     }
   }
 
-  onDeploymentLog(
-    deploymentId: string,
-    callback: LogCallback,
-  ): () => void {
+  onDeploymentLog(deploymentId: string, callback: LogCallback): () => void {
     if (!this.logSubscribers.has(deploymentId)) {
       this.logSubscribers.set(deploymentId, new Set());
     }

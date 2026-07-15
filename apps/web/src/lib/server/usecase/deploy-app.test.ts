@@ -6,7 +6,6 @@ import {
   TEST_ORG_ID,
 } from "./test-utils";
 import { createDeployApp } from "./deploy-app";
-import type { AppSpec } from "../domain/app-spec";
 
 describe("deployApp", () => {
   it("creates an app and deployment with executing status", async () => {

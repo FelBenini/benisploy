@@ -182,7 +182,7 @@
             <button type="button" onclick={addEnvVar}>Add</button>
           </div>
 
-          {#each Object.entries(envVars) as [key, val]}
+          {#each Object.entries(envVars) as [key, val] (key)}
             <div class="env-row">
               <code>{key}</code>
               <span>=</span>
@@ -199,7 +199,7 @@
 
       {#if deployLogs.length > 0}
         <div class="logs" bind:this={logContainer}>
-          {#each deployLogs as log}
+          {#each deployLogs as log (log.timestamp + log.message)}
             <div class="log-line" class:stderr={log.stream === "stderr"}>
               <span class="log-stream">{log.stream === "stderr" ? "ERR" : "OUT"}</span>
               <span class="log-msg">{log.message}</span>

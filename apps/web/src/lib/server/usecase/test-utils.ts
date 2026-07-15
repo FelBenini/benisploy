@@ -46,9 +46,12 @@ export class InMemoryServerRepo implements ServerRepository {
     const server: Server = {
       id: input.id,
       name: input.name,
+      address: input.address ?? "",
       status: input.status,
+      cpuCores: input.cpuCores ?? 0,
       memoryBytes: input.memoryBytes,
       diskBytes: input.diskBytes,
+      labels: input.labels ?? {},
       createdAt: input.createdAt,
       updatedAt: input.updatedAt,
       lastHeartbeatAt: input.lastHeartbeatAt,
@@ -126,11 +129,7 @@ export class InMemoryAppRepo implements AppRepository {
     return Array.from(this.orgMap(orgId).values());
   }
 
-  async updateStatus(
-    orgId: string,
-    id: string,
-    status: string,
-  ): Promise<void> {
+  async updateStatus(orgId: string, id: string, status: string): Promise<void> {
     const a = this.orgMap(orgId).get(id);
     if (a) {
       a.status = status;
@@ -179,11 +178,7 @@ export class InMemoryDeploymentRepo implements DeploymentRepository {
     );
   }
 
-  async updateStatus(
-    orgId: string,
-    id: string,
-    status: string,
-  ): Promise<void> {
+  async updateStatus(orgId: string, id: string, status: string): Promise<void> {
     const d = this.orgMap(orgId).get(id);
     if (d) {
       d.status = status;
