@@ -7,11 +7,22 @@ export interface LogEntry {
   message: string;
 }
 
+export interface DeploymentResult {
+  success: boolean;
+  error?: string;
+}
+
+export interface DeploymentMeta {
+  orgId: string;
+  appId: string;
+}
+
 export interface NodeAgentClient {
-  deploy(
+  sendDeploy(
     serverId: string,
     deploymentId: string,
     appSpec: AppSpec,
+    meta?: DeploymentMeta,
   ): Promise<void>;
   getStatus(serverId: string): Promise<ServerStatusReport>;
   streamLogs(
@@ -26,4 +37,14 @@ export interface NodeAgentClient {
     removeVolumes: boolean,
   ): Promise<void>;
   healthCheck(serverId: string): Promise<boolean>;
+
+  onDeploymentLog(
+    deploymentId: string,
+    callback: (entry: LogEntry) => void,
+  ): () => void;
+
+  onDeploymentComplete(
+    deploymentId: string,
+    callback: (result: DeploymentResult) => void,
+  ): () => void;
 }

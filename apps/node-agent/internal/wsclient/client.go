@@ -11,6 +11,7 @@ import (
 	"time"
 
 	protocol "github.com/benisploy/agent-protocol/go"
+	"github.com/benisploy/node-agent/internal/compose"
 	"github.com/benisploy/node-agent/internal/health"
 	"github.com/gorilla/websocket"
 )
@@ -27,6 +28,7 @@ type Config struct {
 	ServerID          string
 	HeartbeatInterval time.Duration
 	TLSConfig         *tls.Config
+	ComposeMgr        *compose.Manager
 }
 
 func (c *Config) heartbeatInterval() time.Duration {
@@ -226,6 +228,18 @@ func (c *Client) dispatch(ctx context.Context, env protocol.Envelope) error {
 	case protocol.TypeGetStatus:
 		return c.handleGetStatus(ctx, env.ID)
 
+	case protocol.TypeDeploy:
+		if c.config.ComposeMgr == nil {
+			return c.sendError(ctx, env.ID, "compose_manager_unavailable", "compose manager not configured")
+		}
+		go c.handleDeploy(ctx, env)
+
+	case protocol.TypeStreamLogs:
+		if c.config.ComposeMgr == nil {
+			return c.sendError(ctx, env.ID, "compose_manager_unavailable", "compose manager not configured")
+		}
+		go c.handleStreamLogs(ctx, env)
+
 	case protocol.TypeError:
 		var errPayload protocol.ErrorPayload
 		if err := json.Unmarshal(env.Payload, &errPayload); err != nil {
@@ -239,8 +253,167 @@ func (c *Client) dispatch(ctx context.Context, env protocol.Envelope) error {
 	return nil
 }
 
+func (c *Client) handleDeploy(ctx context.Context, env protocol.Envelope) {
+	var deploy protocol.DeployPayload
+	if err := json.Unmarshal(env.Payload, &deploy); err != nil {
+		log.Printf("deploy: failed to unmarshal payload: %v", err)
+		_ = c.sendError(ctx, env.ID, "invalid_payload", "failed to parse deploy request")
+		return
+	}
+
+	log.Printf("deploy: processing deployment %s (app: %s)", deploy.DeploymentID, deploy.AppSpec.Name)
+
+	if _, err := c.config.ComposeMgr.GenerateComposeFile(deploy.DeploymentID, &deploy.AppSpec, deploy.ComposeContent); err != nil {
+		log.Printf("deploy: failed to generate compose file: %v", err)
+		_ = c.sendError(ctx, env.ID, "compose_generation_failed", err.Error())
+		return
+	}
+
+	c.sendLogEntry(ctx, deploy.DeploymentID, "stdout", "Generated compose file, starting deploy...")
+
+	lineCh := make(chan compose.LineOutput, 100)
+	errCh := make(chan error, 1)
+
+	go func() {
+		errCh <- c.config.ComposeMgr.Deploy(ctx, deploy.DeploymentID, lineCh)
+		close(lineCh)
+	}()
+
+	for line := range lineCh {
+		c.sendLogEntry(ctx, deploy.DeploymentID, line.Stream, line.Line)
+	}
+
+	err := <-errCh
+	if err != nil {
+		log.Printf("deploy: failed to deploy %s: %v", deploy.DeploymentID, err)
+		c.sendLogEntry(ctx, deploy.DeploymentID, "stderr", fmt.Sprintf("Deploy failed: %v", err))
+		_ = c.sendError(ctx, env.ID, "deploy_failed", err.Error())
+		return
+	}
+
+	c.sendLogEntry(ctx, deploy.DeploymentID, "stdout", "Deploy succeeded")
+
+	respPayload, err := json.Marshal(protocol.DeployResponsePayload{
+		Accepted:     true,
+		DeploymentID: deploy.DeploymentID,
+	})
+	if err != nil {
+		log.Printf("deploy: failed to marshal response: %v", err)
+		return
+	}
+
+	resp := protocol.Envelope{
+		Type:      protocol.TypeDeployResp,
+		ID:        env.ID,
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
+		Payload:   respPayload,
+	}
+
+	if err := c.send(ctx, resp); err != nil {
+		log.Printf("deploy: failed to send response: %v", err)
+	}
+}
+
+func (c *Client) sendLogEntry(ctx context.Context, deploymentID, stream, message string) {
+	entry := protocol.LogEntryPayload{
+		Timestamp:    time.Now().UTC().Format(time.RFC3339),
+		Stream:       stream,
+		Message:      message,
+		DeploymentID: deploymentID,
+	}
+
+	raw, err := json.Marshal(entry)
+	if err != nil {
+		log.Printf("send log entry: marshal: %v", err)
+		return
+	}
+
+	env := protocol.Envelope{
+		Type:      protocol.TypeLogEntry,
+		ID:        fmt.Sprintf("deploy-%s", deploymentID),
+		Timestamp: entry.Timestamp,
+		Payload:   raw,
+	}
+
+	if err := c.send(ctx, env); err != nil {
+		log.Printf("send log entry: %v", err)
+	}
+}
+
+func (c *Client) handleStreamLogs(ctx context.Context, env protocol.Envelope) {
+	var opts protocol.StreamLogsPayload
+	if err := json.Unmarshal(env.Payload, &opts); err != nil {
+		log.Printf("stream_logs: failed to unmarshal payload: %v", err)
+		_ = c.sendError(ctx, env.ID, "invalid_payload", "failed to parse stream_logs request")
+		return
+	}
+
+	log.Printf("stream_logs: streaming logs for app %s", opts.AppID)
+
+	logCh := make(chan protocol.LogEntryPayload, 100)
+
+	go func() {
+		if err := c.config.ComposeMgr.StreamLogs(ctx, opts.AppID, opts, logCh); err != nil {
+			if ctx.Err() == nil {
+				log.Printf("stream_logs: error streaming logs: %v", err)
+			}
+		}
+		close(logCh)
+	}()
+
+	for entry := range logCh {
+		entryPayload, err := json.Marshal(entry)
+		if err != nil {
+			log.Printf("stream_logs: failed to marshal log entry: %v", err)
+			continue
+		}
+
+		msg := protocol.Envelope{
+			Type:      protocol.TypeLogEntry,
+			ID:        env.ID,
+			Timestamp: entry.Timestamp,
+			Payload:   entryPayload,
+		}
+
+		if err := c.send(ctx, msg); err != nil {
+			log.Printf("stream_logs: failed to send log entry: %v", err)
+			return
+		}
+	}
+}
+
+func (c *Client) sendError(ctx context.Context, originalID string, code string, message string) error {
+	errPayload, err := json.Marshal(protocol.ErrorPayload{
+		Code:              code,
+		Message:           message,
+		OriginalMessageID: originalID,
+	})
+	if err != nil {
+		return fmt.Errorf("marshal error payload: %w", err)
+	}
+
+	return c.send(ctx, protocol.Envelope{
+		Type:      protocol.TypeError,
+		ID:        originalID,
+		Timestamp: time.Now().UTC().Format(time.RFC3339),
+		Payload:   errPayload,
+	})
+}
+
 func (c *Client) handleGetStatus(ctx context.Context, originalID string) error {
 	hb := c.health.Gather(c.config.ServerID)
+
+	var containers []protocol.ContainerInfo
+	if c.config.ComposeMgr != nil {
+		var err error
+		containers, err = c.config.ComposeMgr.ListAllContainers(ctx)
+		if err != nil {
+			log.Printf("get_status: failed to list containers: %v", err)
+		}
+	}
+	if containers == nil {
+		containers = []protocol.ContainerInfo{}
+	}
 
 	statusPayload := protocol.StatusResponsePayload{
 		CPUPercent:    hb.CPUPercent,
@@ -248,7 +421,7 @@ func (c *Client) handleGetStatus(ctx context.Context, originalID string) error {
 		MemoryTotal:   hb.MemoryTotal,
 		DiskUsed:      hb.DiskUsed,
 		DiskTotal:     hb.DiskTotal,
-		Containers:    []protocol.ContainerInfo{},
+		Containers:    containers,
 		UptimeSeconds: hb.UptimeSeconds,
 	}
 

@@ -118,9 +118,10 @@ type StreamLogsPayload struct {
 }
 
 type LogEntryPayload struct {
-	Timestamp string `json:"timestamp"`
-	Stream    string `json:"stream"`
-	Message   string `json:"message"`
+	Timestamp    string `json:"timestamp"`
+	Stream       string `json:"stream"`
+	Message      string `json:"message"`
+	DeploymentID string `json:"deploymentId,omitempty"`
 }
 
 // ── heartbeat / heartbeat_ack ───────────────────────────────────────────

@@ -28,6 +28,7 @@ agent
 *.swp
 *.swo
 *~
+compile_flags.txt
 
 # Logs
 *.log

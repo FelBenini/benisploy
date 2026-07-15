@@ -47,10 +47,21 @@ export function createDeployApp(repo: Repository, nodeAgent: NodeAgentClient) {
       createdDeployment.id,
       "executing",
     );
-    await nodeAgent.deploy(serverId, createdDeployment.id, appSpec);
 
-    await repo.deployments.updateStatus(orgId, createdDeployment.id, "healthy");
-    await repo.apps.updateStatus(orgId, createdApp.id, "healthy");
+    try {
+      await nodeAgent.sendDeploy(serverId, createdDeployment.id, appSpec, {
+        orgId,
+        appId: createdApp.id,
+      });
+    } catch (err) {
+      await repo.deployments.updateStatus(
+        orgId,
+        createdDeployment.id,
+        "failed",
+      );
+      await repo.apps.updateStatus(orgId, createdApp.id, "degraded");
+      throw err;
+    }
 
     const finalApp = (await repo.apps.get(orgId, createdApp.id))!;
     const finalDeployment = (await repo.deployments.getLatest(

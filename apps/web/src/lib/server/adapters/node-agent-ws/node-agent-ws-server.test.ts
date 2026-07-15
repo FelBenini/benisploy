@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { WebSocket } from "ws";
-import type { ServerWithOrg } from "$lib/server/ports/repository";
+import type { Repository, ServerWithOrg } from "$lib/server/ports/repository";
 import { NodeAgentWsServer } from "./node-agent-ws-server";
 
 const serverStore = new Map<
@@ -8,7 +8,7 @@ const serverStore = new Map<
   { orgId: string; server: Record<string, unknown> }
 >();
 
-const inMemRepo = {
+const inMemRepo: Repository = {
   servers: {
     async getByIdAny(id: string): Promise<ServerWithOrg | null> {
       const entry = serverStore.get(id);
@@ -32,6 +32,86 @@ const inMemRepo = {
       throw new Error("not implemented");
     },
     async updateStatus() {
+      throw new Error("not implemented");
+    },
+  },
+  apps: {
+    async create() {
+      throw new Error("not implemented");
+    },
+    async get() {
+      throw new Error("not implemented");
+    },
+    async list() {
+      throw new Error("not implemented");
+    },
+    async updateStatus() {
+      throw new Error("not implemented");
+    },
+    async delete() {
+      throw new Error("not implemented");
+    },
+  },
+  deployments: {
+    async create() {
+      throw new Error("not implemented");
+    },
+    async listForApp() {
+      throw new Error("not implemented");
+    },
+    async getLatest() {
+      throw new Error("not implemented");
+    },
+    async updateStatus() {
+      throw new Error("not implemented");
+    },
+  },
+  users: {
+    async create() {
+      throw new Error("not implemented");
+    },
+    async get() {
+      throw new Error("not implemented");
+    },
+    async getByEmail() {
+      throw new Error("not implemented");
+    },
+    async getPasswordHashByEmail() {
+      throw new Error("not implemented");
+    },
+  },
+  sessions: {
+    async create() {
+      throw new Error("not implemented");
+    },
+    async get() {
+      throw new Error("not implemented");
+    },
+    async delete() {
+      throw new Error("not implemented");
+    },
+    async deleteAllForUser() {
+      throw new Error("not implemented");
+    },
+  },
+  systemSetup: {
+    async isConfigured() {
+      throw new Error("not implemented");
+    },
+    async tryAcquire() {
+      throw new Error("not implemented");
+    },
+  },
+  orgs: {
+    async create() {
+      throw new Error("not implemented");
+    },
+  },
+  memberships: {
+    async create() {
+      throw new Error("not implemented");
+    },
+    async findByUserId() {
       throw new Error("not implemented");
     },
   },

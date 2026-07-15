@@ -4,7 +4,7 @@ import { NodeAgentWsServer } from "./node-agent-ws-server";
 let instance: NodeAgentWsServer | null = null;
 
 export function createNodeAgentWsServer(
-  repo: Pick<Repository, "servers">,
+  repo: Repository,
   port?: number,
 ): NodeAgentWsServer {
   if (instance) return instance;

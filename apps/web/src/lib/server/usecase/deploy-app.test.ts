@@ -8,7 +8,7 @@ import {
 import { createDeployApp } from "./deploy-app";
 
 describe("deployApp", () => {
-  it("creates an app and deployment with healthy status", async () => {
+  it("creates an app and deployment with executing status", async () => {
     const repo = new InMemoryRepository();
     const nodeAgent = new FakeNodeAgentClient();
     const deployApp = createDeployApp(repo, nodeAgent);
@@ -20,8 +20,8 @@ describe("deployApp", () => {
 
     expect(result.app.name).toBe("test-app");
     expect(result.app.serverId).toBe(serverId);
-    expect(result.app.status).toBe("healthy");
-    expect(result.deployment.status).toBe("healthy");
+    expect(result.app.status).toBe("deploying");
+    expect(result.deployment.status).toBe("executing");
     expect(result.deployment.version).toBe(1);
   });
 
@@ -60,22 +60,48 @@ describe("deployApp", () => {
     expect(storedDeployments).toHaveLength(1);
   });
 
-  it("transitions deployment through expected states", async () => {
+  it("marks deployment as failed on node agent error", async () => {
+    const repo = new InMemoryRepository();
+    const nodeAgent = new FakeNodeAgentClient();
+    nodeAgent.sendDeployImpl = async () => {
+      throw new Error("agent disconnected");
+    };
+    const deployApp = createDeployApp(repo, nodeAgent);
+
+    const serverId = "server-5";
+    const spec = validAppSpec();
+
+    await expect(deployApp(TEST_ORG_ID, spec, serverId)).rejects.toThrow(
+      "agent disconnected",
+    );
+
+    const apps = await repo.apps.list(TEST_ORG_ID);
+    expect(apps).toHaveLength(1);
+    expect(apps[0].status).toBe("degraded");
+
+    const deployments = await repo.deployments.listForApp(
+      TEST_ORG_ID,
+      apps[0].id,
+    );
+    expect(deployments).toHaveLength(1);
+    expect(deployments[0].status).toBe("failed");
+  });
+
+  it("transitions deployment to executing state", async () => {
     const repo = new InMemoryRepository();
     const nodeAgent = new FakeNodeAgentClient();
     const deployApp = createDeployApp(repo, nodeAgent);
 
     const result = await deployApp(TEST_ORG_ID, validAppSpec(), "server-4");
 
-    expect(result.deployment.status).toBe("healthy");
+    expect(result.deployment.status).toBe("executing");
 
     const initialDeployments = await repo.deployments.listForApp(
       TEST_ORG_ID,
       result.app.id,
     );
     const dep = initialDeployments[0];
-
     expect(dep.id).toBe(result.deployment.id);
-    expect(dep.status).toBe("healthy");
+    expect(dep.status).toBe("executing");
   });
 });
