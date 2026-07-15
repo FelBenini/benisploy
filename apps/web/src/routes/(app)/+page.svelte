@@ -14,7 +14,7 @@
   }
   let deployResult = $state<unknown>(null);
   let deployError = $state<string | null>(null);
-  let deployLogs = $state<Array<{ stream: string; message: string }>>([]);
+  let deployLogs = $state<Array<{ timestamp: string; stream: string; message: string }>>([]);
   let deployStatus = $state<string | null>(null);
 
   let appName = $state("test-app");

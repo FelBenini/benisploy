@@ -1,8 +1,22 @@
-import type { NodeAgentClient, LogEntry } from "../../ports/node-agent-client";
+import type {
+  NodeAgentClient,
+  LogEntry,
+  DeploymentResult,
+  DeploymentMeta,
+} from "../../ports/node-agent-client";
 import type { AppSpec } from "../../domain/app-spec";
 import type { ServerStatusReport } from "../../domain/server";
 
 export class NopNodeAgentClient implements NodeAgentClient {
+  async sendDeploy(
+    _serverId: string,
+    _deploymentId: string,
+    _appSpec: AppSpec,
+    _meta?: DeploymentMeta,
+  ): Promise<void> {
+    throw new Error("Node agent not connected");
+  }
+
   async deploy(
     _serverId: string,
     _deploymentId: string,
@@ -37,5 +51,19 @@ export class NopNodeAgentClient implements NodeAgentClient {
 
   async healthCheck(_serverId: string): Promise<boolean> {
     throw new Error("Node agent not connected");
+  }
+
+  onDeploymentLog(
+    _deploymentId: string,
+    _callback: (entry: LogEntry) => void,
+  ): () => void {
+    return () => {};
+  }
+
+  onDeploymentComplete(
+    _deploymentId: string,
+    _callback: (result: DeploymentResult) => void,
+  ): () => void {
+    return () => {};
   }
 }

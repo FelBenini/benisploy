@@ -1,10 +1,12 @@
 import type { AppSpec } from "../domain/app-spec";
 import type { App } from "../domain/app";
 import type { Server } from "../domain/server";
+import type { User } from "../domain/user";
 import type { Deployment } from "../domain/deployment";
 import type {
   Repository,
   ServerRepository,
+  ServerWithOrg,
   AppRepository,
   DeploymentRepository,
   UserRepository,
@@ -13,6 +15,9 @@ import type {
   OrgRepository,
   OrgMembershipRepository,
 } from "../ports/repository";
+import type { Session } from "../domain/session";
+import type { Org } from "../domain/org";
+import type { OrgMembership } from "../domain/org-membership";
 import type {
   NodeAgentClient,
   LogEntry,
@@ -64,20 +69,10 @@ export class InMemoryServerRepo implements ServerRepository {
     return this.orgMap(orgId).get(id) ?? null;
   }
 
-  async getByIdAny(id: string): Promise<{
-    orgId: string;
-    id: string;
-    name: string;
-    status: string;
-    createdAt: string;
-    updatedAt: string;
-    lastHeartbeatAt?: string;
-    memoryBytes?: number;
-    diskBytes?: number;
-  } | null> {
+  async getByIdAny(id: string): Promise<ServerWithOrg | null> {
     for (const [orgId, store] of this.data) {
-      const server = store.get(id);
-      if (server) return { ...server, orgId };
+      const s = store.get(id);
+      if (s) return { ...s, orgId };
     }
     return null;
   }
@@ -89,7 +84,7 @@ export class InMemoryServerRepo implements ServerRepository {
   async updateStatus(orgId: string, id: string, status: string): Promise<void> {
     const s = this.orgMap(orgId).get(id);
     if (s) {
-      s.status = status;
+      s.status = status as Server["status"];
       s.updatedAt = new Date().toISOString();
     }
   }
@@ -132,7 +127,7 @@ export class InMemoryAppRepo implements AppRepository {
   async updateStatus(orgId: string, id: string, status: string): Promise<void> {
     const a = this.orgMap(orgId).get(id);
     if (a) {
-      a.status = status;
+      a.status = status as App["status"];
       a.updatedAt = new Date().toISOString();
     }
   }
@@ -181,14 +176,14 @@ export class InMemoryDeploymentRepo implements DeploymentRepository {
   async updateStatus(orgId: string, id: string, status: string): Promise<void> {
     const d = this.orgMap(orgId).get(id);
     if (d) {
-      d.status = status;
+      d.status = status as Deployment["status"];
       d.updatedAt = new Date().toISOString();
     }
   }
 }
 
 export class InMemoryUserRepo implements UserRepository {
-  private data = new Map<string, Map<string, unknown>>();
+  private data = new Map<string, Map<string, User>>();
   private orgMap(orgId: string) {
     let m = this.data.get(orgId);
     if (!m) {
@@ -200,36 +195,36 @@ export class InMemoryUserRepo implements UserRepository {
   async create(
     _db: unknown,
     orgId: string,
-    user: unknown,
+    user: User,
     _pw?: string,
-  ): Promise<unknown> {
+  ): Promise<User> {
     const store = this.orgMap(orgId);
-    store.set((user as { id: string }).id, user);
+    store.set(user.id, user);
     return user;
   }
-  async get(orgId: string, id: string): Promise<unknown> {
+  async get(orgId: string, id: string): Promise<User | null> {
     return this.orgMap(orgId).get(id) ?? null;
   }
-  async getByEmail(orgId: string, email: string): Promise<unknown> {
+  async getByEmail(orgId: string, email: string): Promise<User | null> {
     for (const u of this.orgMap(orgId).values()) {
-      if ((u as { email: string }).email === email) return u;
+      if (u.email === email) return u;
     }
     return null;
   }
   async getPasswordHashByEmail(
     _email: string,
-  ): Promise<{ user: unknown; passwordHash: string } | null> {
+  ): Promise<{ user: User; passwordHash: string } | null> {
     return null;
   }
 }
 
 export class InMemorySessionRepo implements SessionRepository {
-  private data = new Map<string, unknown>();
-  async create(_db: unknown, session: unknown): Promise<unknown> {
-    this.data.set((session as { id: string }).id, session);
+  private data = new Map<string, Session>();
+  async create(_db: unknown, session: Session): Promise<Session> {
+    this.data.set(session.id, session);
     return session;
   }
-  async get(id: string): Promise<unknown> {
+  async get(id: string): Promise<Session | null> {
     return this.data.get(id) ?? null;
   }
   async delete(id: string): Promise<void> {
@@ -251,20 +246,20 @@ export class InMemorySystemSetupRepo implements SystemSetupRepository {
 }
 
 export class InMemoryOrgRepo implements OrgRepository {
-  private data = new Map<string, unknown>();
-  async create(_db: unknown, org: unknown): Promise<unknown> {
-    this.data.set((org as { id: string }).id, org);
+  private data = new Map<string, Org>();
+  async create(_db: unknown, org: Org): Promise<Org> {
+    this.data.set(org.id, org);
     return org;
   }
 }
 
 export class InMemoryMembershipRepo implements OrgMembershipRepository {
-  private data = new Map<string, unknown>();
-  async create(_db: unknown, m: unknown): Promise<unknown> {
-    this.data.set((m as { userId: string }).userId, m);
+  private data = new Map<string, OrgMembership>();
+  async create(_db: unknown, m: OrgMembership): Promise<OrgMembership> {
+    this.data.set(m.userId, m);
     return m;
   }
-  async findByUserId(userId: string): Promise<unknown> {
+  async findByUserId(userId: string): Promise<OrgMembership | null> {
     return this.data.get(userId) ?? null;
   }
 }
