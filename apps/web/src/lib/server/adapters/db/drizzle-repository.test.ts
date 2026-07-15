@@ -99,9 +99,9 @@ describe("DrizzleRepository integration", () => {
     );
 
     expect(result.app.name).toBe("int-app");
-    expect(result.app.status).toBe("healthy");
+    expect(result.app.status).toBe("deploying");
     expect(result.deployment.version).toBe(1);
-    expect(result.deployment.status).toBe("healthy");
+    expect(result.deployment.status).toBe("executing");
 
     const stored = await repo.apps.get(ORG, result.app.id);
     expect(stored).not.toBeNull();

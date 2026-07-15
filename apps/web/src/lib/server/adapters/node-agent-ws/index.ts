@@ -1,10 +1,12 @@
 import type { Repository } from "../../ports/repository";
 import { NodeAgentWsServer } from "./node-agent-ws-server";
+import { db } from "$lib/server/db/client";
+import { DrizzleRepository } from "$lib/server/adapters/db/drizzle-repository";
 
 let instance: NodeAgentWsServer | null = null;
 
 export function createNodeAgentWsServer(
-  repo: Pick<Repository, "servers">,
+  repo: Repository,
   port?: number,
 ): NodeAgentWsServer {
   if (instance) return instance;

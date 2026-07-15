@@ -3,8 +3,15 @@ import {
   HeartbeatSchema,
   StatusResponseSchema,
   DeployResponseSchema,
+  LogEntrySchema,
+  ErrorSchema,
 } from "agent-protocol";
-import type { LogEntry, NodeAgentClient } from "../../ports/node-agent-client";
+import type {
+  LogEntry,
+  DeploymentResult,
+  DeploymentMeta,
+  NodeAgentClient,
+} from "../../ports/node-agent-client";
 import type { ServerStatusReport } from "../../domain/server";
 import type { AppSpec } from "../../domain/app-spec";
 import type { Repository } from "../../ports/repository";
@@ -17,14 +24,23 @@ type PendingRequest = {
   timer: NodeJS.Timeout;
 };
 
+type LogCallback = (entry: LogEntry) => void;
+type CompleteCallback = (result: DeploymentResult) => void;
+
 export class NodeAgentWsServer implements NodeAgentClient {
   readonly port: number;
   private wss: WebSocketServer;
   private connections = new Map<string, WebSocket>();
   private pending = new Map<string, PendingRequest>();
-  private repo: Pick<Repository, "servers">;
+  private repo: Repository;
 
-  constructor(repo: Pick<Repository, "servers">, port: number = 3001) {
+  private logBuffers = new Map<string, LogEntry[]>();
+  private logSubscribers = new Map<string, Set<LogCallback>>();
+  private completeSubscribers = new Map<string, Set<CompleteCallback>>();
+  private deployMetaMap = new Map<string, DeploymentMeta>();
+  private deployMsgIds = new Map<string, string>();
+
+  constructor(repo: Repository, port: number = 3001) {
     this.repo = repo;
     this.wss = new WebSocketServer({ port });
     const addr = this.wss.address();
@@ -60,10 +76,17 @@ export class NodeAgentWsServer implements NodeAgentClient {
           this.handleHeartbeat(ws, obj, _prevServerId);
           break;
         }
-        case "status_response":
+        case "log_entry":
+          this.handleLogEntry(obj);
+          break;
         case "deploy_response":
-        case "heartbeat_ack":
+          this.handleDeployResponse(obj);
+          break;
         case "error":
+          this.handleAgentError(obj);
+          break;
+        case "status_response":
+        case "heartbeat_ack":
           this.handleResponse(obj);
           break;
         default:
@@ -86,6 +109,148 @@ export class NodeAgentWsServer implements NodeAgentClient {
     });
   }
 
+  private async handleLogEntry(msg: Record<string, unknown>): Promise<void> {
+    const parsed = LogEntrySchema.safeParse(msg);
+    if (!parsed.success) return;
+
+    const entry: LogEntry = {
+      timestamp: parsed.data.payload.timestamp,
+      stream: parsed.data.payload.stream,
+      message: parsed.data.payload.message,
+    };
+
+    const deploymentId = parsed.data.payload.deploymentId;
+    if (!deploymentId) return;
+
+    let buf = this.logBuffers.get(deploymentId);
+    if (!buf) {
+      buf = [];
+      this.logBuffers.set(deploymentId, buf);
+    }
+    buf.push(entry);
+
+    const subs = this.logSubscribers.get(deploymentId);
+    if (subs) {
+      for (const cb of subs) {
+        try {
+          cb(entry);
+        } catch {
+          // subscriber error, skip
+        }
+      }
+    }
+  }
+
+  private async handleDeployResponse(
+    msg: Record<string, unknown>,
+  ): Promise<void> {
+    const parsed = DeployResponseSchema.safeParse(msg);
+    if (!parsed.success) return;
+
+    const deploymentId = parsed.data.payload.deploymentId;
+    const accepted = parsed.data.payload.accepted;
+
+    const envId = typeof msg.id === "string" ? msg.id : "";
+    this.deployMsgIds.delete(envId);
+
+    const result: DeploymentResult = {
+      success: accepted,
+      error: accepted ? undefined : "Agent rejected deployment",
+    };
+
+    await this.finalizeDeployment(deploymentId, result);
+  }
+
+  private async handleAgentError(msg: Record<string, unknown>): Promise<void> {
+    const parsed = ErrorSchema.safeParse(msg);
+    if (!parsed.success) return;
+
+    const envId = typeof msg.id === "string" ? msg.id : "";
+    const deploymentId =
+      this.deployMsgIds.get(envId) ??
+      this.deployMsgIds.get(parsed.data.payload.originalMessageId);
+
+    if (deploymentId) {
+      const result: DeploymentResult = {
+        success: false,
+        error: parsed.data.payload.message,
+      };
+      await this.finalizeDeployment(deploymentId, result);
+    }
+
+    this.handleResponse(msg);
+  }
+
+  private async finalizeDeployment(
+    deploymentId: string,
+    result: DeploymentResult,
+  ): Promise<void> {
+    const subs = this.completeSubscribers.get(deploymentId);
+    if (subs) {
+      for (const cb of subs) {
+        try {
+          cb(result);
+        } catch {
+          // subscriber error, skip
+        }
+      }
+    }
+
+    this.cleanupDeployment(deploymentId);
+
+    const meta = this.deployMetaMap.get(deploymentId);
+    if (!meta) {
+      console.error(
+        `no deploy meta for ${deploymentId}, cannot update status`,
+      );
+      return;
+    }
+    this.deployMetaMap.delete(deploymentId);
+
+    try {
+      if (result.success) {
+        await this.repo.deployments.updateStatus(
+          meta.orgId,
+          deploymentId,
+          "healthy",
+        );
+        await this.repo.apps.updateStatus(meta.orgId, meta.appId, "healthy");
+      } else {
+        await this.repo.deployments.updateStatus(
+          meta.orgId,
+          deploymentId,
+          "failed",
+        );
+        await this.repo.apps.updateStatus(meta.orgId, meta.appId, "degraded");
+      }
+    } catch (err) {
+      console.error(
+        `failed to update deployment ${deploymentId} status:`,
+        err,
+      );
+    }
+  }
+
+  private cleanupDeployment(deploymentId: string): void {
+    this.logSubscribers.delete(deploymentId);
+    this.completeSubscribers.delete(deploymentId);
+    this.deployMetaMap.delete(deploymentId);
+
+    for (const [msgId, depId] of this.deployMsgIds) {
+      if (depId === deploymentId) {
+        this.deployMsgIds.delete(msgId);
+      }
+    }
+
+    setTimeout(() => {
+      this.logBuffers.delete(deploymentId);
+    }, 60_000);
+  }
+
+  getBufferedLogs(deploymentId: string): LogEntry[] {
+    return this.logBuffers.get(deploymentId) ?? [];
+  }
+
   private async handleHeartbeat(
     ws: WebSocket,
     msg: Record<string, unknown>,
@@ -93,7 +258,6 @@ export class NodeAgentWsServer implements NodeAgentClient {
   ): Promise<void> {
     const parsed = HeartbeatSchema.safeParse(msg);
     if (!parsed.success) {
-      // TODO: auth — bare serverId accepted for now
       return;
     }
 
@@ -185,6 +349,34 @@ export class NodeAgentWsServer implements NodeAgentClient {
     });
   }
 
+  async sendDeploy(
+    serverId: string,
+    deploymentId: string,
+    appSpec: AppSpec,
+    meta?: DeploymentMeta,
+  ): Promise<void> {
+    const ws = this.connections.get(serverId);
+    if (!ws || ws.readyState !== WebSocket.OPEN) {
+      throw new Error("Node agent not connected");
+    }
+
+    const msgId = crypto.randomUUID();
+
+    if (meta) {
+      this.deployMetaMap.set(deploymentId, meta);
+    }
+    this.deployMsgIds.set(msgId, deploymentId);
+
+    const msg = {
+      type: "deploy",
+      id: msgId,
+      timestamp: new Date().toISOString(),
+      payload: { deploymentId, appSpec },
+    };
+
+    ws.send(JSON.stringify(msg));
+  }
+
   async getStatus(serverId: string): Promise<ServerStatusReport> {
     const resp = await this.request(
       serverId,
@@ -211,13 +403,9 @@ export class NodeAgentWsServer implements NodeAgentClient {
     serverId: string,
     deploymentId: string,
     appSpec: AppSpec,
+    meta?: DeploymentMeta,
   ): Promise<void> {
-    await this.request(
-      serverId,
-      "deploy",
-      { deploymentId, appSpec },
-      DeployResponseSchema,
-    );
+    return this.sendDeploy(serverId, deploymentId, appSpec, meta);
   }
 
   async streamLogs(
@@ -251,6 +439,32 @@ export class NodeAgentWsServer implements NodeAgentClient {
     } catch {
       return false;
     }
+  }
+
+  onDeploymentLog(
+    deploymentId: string,
+    callback: LogCallback,
+  ): () => void {
+    if (!this.logSubscribers.has(deploymentId)) {
+      this.logSubscribers.set(deploymentId, new Set());
+    }
+    this.logSubscribers.get(deploymentId)!.add(callback);
+    return () => {
+      this.logSubscribers.get(deploymentId)?.delete(callback);
+    };
+  }
+
+  onDeploymentComplete(
+    deploymentId: string,
+    callback: CompleteCallback,
+  ): () => void {
+    if (!this.completeSubscribers.has(deploymentId)) {
+      this.completeSubscribers.set(deploymentId, new Set());
+    }
+    this.completeSubscribers.get(deploymentId)!.add(callback);
+    return () => {
+      this.completeSubscribers.get(deploymentId)?.delete(callback);
+    };
   }
 
   close(): void {
