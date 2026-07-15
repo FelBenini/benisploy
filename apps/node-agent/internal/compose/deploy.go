@@ -35,6 +35,7 @@ func (m *Manager) Deploy(ctx context.Context, deploymentID string, output chan<-
 
 	output <- LineOutput{Line: "Starting containers...", Stream: "stdout"}
 
+	//nolint:gosec // path is internally constructed from deploymentID, not user input
 	cmd := exec.CommandContext(ctx, "docker", "compose", "-f", path, "up", "-d")
 	cmd.Dir = m.projectDir(deploymentID)
 
@@ -70,6 +71,7 @@ func (m *Manager) tryPullImages(ctx context.Context, composePath, deploymentID s
 			}
 		}
 
+		//nolint:gosec // composePath is internally constructed
 		cmd := exec.CommandContext(pullCtx, "docker", "compose", "-f", composePath, "pull")
 		cmd.Dir = m.projectDir(deploymentID)
 
@@ -121,6 +123,7 @@ func (m *Manager) Remove(ctx context.Context, deploymentID string, removeVolumes
 		args = append(args, "-v")
 	}
 
+	//nolint:gosec // args built from internally managed path
 	cmd := exec.CommandContext(ctx, "docker", args...)
 	cmd.Dir = m.projectDir(deploymentID)
 

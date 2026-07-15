@@ -27,5 +27,5 @@ func (m *Manager) projectDir(deploymentID string) string {
 }
 
 func (m *Manager) ensureDir(deploymentID string) error {
-	return os.MkdirAll(m.projectDir(deploymentID), 0755)
+	return os.MkdirAll(m.projectDir(deploymentID), 0750)
 }

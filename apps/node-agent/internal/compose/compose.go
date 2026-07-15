@@ -70,7 +70,7 @@ func (m *Manager) GenerateComposeFile(deploymentID string, spec *protocol.AppSpe
 	}
 
 	path := m.composePath(deploymentID)
-	if err := os.WriteFile(path, []byte(raw), 0644); err != nil {
+	if err := os.WriteFile(path, []byte(raw), 0600); err != nil {
 		return "", fmt.Errorf("write compose file: %w", err)
 	}
 

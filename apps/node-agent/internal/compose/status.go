@@ -49,6 +49,7 @@ func (m *Manager) GetContainers(ctx context.Context, deploymentID string) ([]pro
 		return nil, nil
 	}
 
+	//nolint:gosec // path is internally constructed from deploymentID
 	cmd := exec.CommandContext(ctx, "docker", "compose", "-f", path, "ps", "--format", "json")
 	cmd.Dir = m.projectDir(deploymentID)
 

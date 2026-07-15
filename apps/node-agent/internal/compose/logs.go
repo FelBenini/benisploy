@@ -24,6 +24,7 @@ func (m *Manager) StreamLogs(ctx context.Context, deploymentID string, opts prot
 		args = append(args, "--tail", fmt.Sprintf("%d", opts.Lines))
 	}
 
+	//nolint:gosec // args built from internally managed path
 	cmd := exec.CommandContext(ctx, "docker", args...)
 	cmd.Dir = m.projectDir(deploymentID)
 

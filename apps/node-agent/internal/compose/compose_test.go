@@ -27,6 +27,7 @@ func TestGenerateComposeFile_Minimal(t *testing.T) {
 	require.NoError(t, err)
 	assert.FileExists(t, path)
 
+	//nolint:gosec // test file
 	data, err := os.ReadFile(path)
 	require.NoError(t, err)
 	content := string(data)
@@ -53,6 +54,7 @@ func TestGenerateComposeFile_WithResourceLimits(t *testing.T) {
 	path, err := m.GenerateComposeFile("deploy-002", spec, "")
 	require.NoError(t, err)
 
+	//nolint:gosec // test file
 	data, err := os.ReadFile(path)
 	require.NoError(t, err)
 	content := string(data)
@@ -80,6 +82,7 @@ func TestGenerateComposeFile_WithHealthCheck(t *testing.T) {
 	path, err := m.GenerateComposeFile("deploy-003", spec, "")
 	require.NoError(t, err)
 
+	//nolint:gosec // test file
 	data, err := os.ReadFile(path)
 	require.NoError(t, err)
 	content := string(data)
@@ -106,6 +109,7 @@ func TestGenerateComposeFile_WithVolumeMounts(t *testing.T) {
 	path, err := m.GenerateComposeFile("deploy-004", spec, "")
 	require.NoError(t, err)
 
+	//nolint:gosec // test file
 	data, err := os.ReadFile(path)
 	require.NoError(t, err)
 	content := string(data)
@@ -132,6 +136,7 @@ services:
 	path, err := m.GenerateComposeFile("deploy-005", spec, "")
 	require.NoError(t, err)
 
+	//nolint:gosec // test file
 	data, err := os.ReadFile(path)
 	require.NoError(t, err)
 	content := string(data)
@@ -160,6 +165,7 @@ services:
 	path, err := m.GenerateComposeFile("deploy-006", spec, composeContent)
 	require.NoError(t, err)
 
+	//nolint:gosec // test file
 	data, err := os.ReadFile(path)
 	require.NoError(t, err)
 	content := string(data)
