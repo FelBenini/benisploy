@@ -128,6 +128,7 @@ export const LogEntrySchema = MessageEnvelopeSchema.extend({
     timestamp: z.string().datetime(),
     stream: z.enum(["stdout", "stderr"]),
     message: z.string(),
+    deploymentId: z.string().optional(),
   }),
 });
 
