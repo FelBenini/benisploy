@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/benisploy/node-agent/internal/compose"
 	"github.com/benisploy/node-agent/internal/health"
 	"github.com/benisploy/node-agent/internal/wsclient"
 )
@@ -24,7 +25,7 @@ func main() {
 
 	wsURL := os.Getenv("CONTROL_PLANE_WS_URL")
 	if wsURL == "" {
-		wsURL = "wss://localhost:3001"
+		wsURL = "ws://localhost:3001"
 	}
 
 	interval := 10 * time.Second
@@ -43,11 +44,15 @@ func main() {
 
 	collector := health.New()
 
+	dataDir := os.Getenv("COMPOSE_DATA_DIR")
+	composeMgr := compose.NewManager(dataDir)
+
 	client := wsclient.New(wsclient.Config{
 		ControlPlaneURL:   wsURL,
 		ServerID:          serverID,
 		HeartbeatInterval: interval,
 		TLSConfig:         tlsConfig,
+		ComposeMgr:        composeMgr,
 	}, collector)
 
 	ctx, cancel := context.WithCancel(context.Background())
