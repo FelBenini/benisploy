@@ -141,6 +141,7 @@ describe("NodeAgentWsServer", () => {
       server: {
         id: "srv-1",
         name: "test",
+        address: "127.0.0.1",
         status: "offline",
         memoryBytes: 8_000_000_000,
         diskBytes: 100_000_000_000,

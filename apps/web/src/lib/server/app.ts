@@ -3,9 +3,11 @@ import { db } from "$lib/server/db/client";
 import type { DbExecutor } from "$lib/server/ports/repository";
 import { DrizzleRepository } from "$lib/server/adapters/db/drizzle-repository";
 import { createNodeAgentWsServer } from "$lib/server/adapters/node-agent-ws";
+import { SshNodeCommandClient } from "$lib/server/adapters/node-ssh";
 import { InMemoryRateLimiter } from "$lib/server/adapters/rate-limit/in-memory";
 import { createRegisterServer } from "$lib/server/usecase/register-server";
 import { createDeployApp } from "$lib/server/usecase/deploy-app";
+import { createDeployAppV2 } from "$lib/server/usecase/deploy-app-v2";
 import { createListApps } from "$lib/server/usecase/list-apps";
 import { createGetApp } from "$lib/server/usecase/get-app";
 import { createGetServerStatus } from "$lib/server/usecase/get-server-status";
@@ -18,6 +20,11 @@ import { hashPassword, verifyPassword } from "$lib/server/auth/password";
 
 const repo = new DrizzleRepository(db);
 const nodeAgent = createNodeAgentWsServer(repo);
+
+const nodeSshClient = new SshNodeCommandClient(async (serverId: string) => {
+  const server = await repo.servers.getByIdAny(serverId);
+  return server ?? null;
+});
 
 const loginIpLimiter = new InMemoryRateLimiter(20, 15 * 60 * 1000);
 const loginAccountLimiter = new InMemoryRateLimiter(5, 15 * 60 * 1000);
@@ -49,9 +56,15 @@ const staleSweepInterval = setInterval(async () => {
 export const app = {
   db,
   repo,
+  nodeSshClient,
+  adapters: {
+    wsNodeAgent: nodeAgent,
+    sshNodeCommand: nodeSshClient,
+  },
   useCases: {
     registerServer: createRegisterServer(repo),
     deployApp: createDeployApp(repo, nodeAgent),
+    deployAppV2: createDeployAppV2(repo, nodeSshClient),
     listApps: createListApps(repo),
     getApp: createGetApp(repo),
     getServerStatus: createGetServerStatus(repo, nodeAgent),

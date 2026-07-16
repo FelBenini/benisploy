@@ -50,6 +50,12 @@ const validInput = {
   diskBytes: 256000000000,
 };
 
+const validInputParsed = {
+  ...validInput,
+  sshPort: 22,
+  sshUser: "root",
+};
+
 describe("POST /api/servers", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -105,6 +111,9 @@ describe("POST /api/servers", () => {
     const createdServer = {
       id: "server-1",
       ...validInput,
+      sshPort: 22,
+      sshUser: "root",
+      sshPrivateKey: "generated-key",
       labels: {},
       status: "offline",
       createdAt: "2025-01-01T00:00:00.000Z",
@@ -118,6 +127,6 @@ describe("POST /api/servers", () => {
     expect(response.status).toBe(201);
     const body = await response.json();
     expect(body.data).toEqual(createdServer);
-    expect(mockRegisterServer).toHaveBeenCalledWith("org-1", validInput);
+    expect(mockRegisterServer).toHaveBeenCalledWith("org-1", validInputParsed);
   });
 });

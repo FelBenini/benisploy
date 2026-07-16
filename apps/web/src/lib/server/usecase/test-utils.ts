@@ -24,6 +24,11 @@ import type {
   DeploymentResult,
   DeploymentMeta,
 } from "../ports/node-agent-client";
+import type {
+  NodeCommandClient as NodeCommandClientType,
+  LogEntry as NodeCommandLogEntry,
+  ContainerState,
+} from "../ports/node-command-client";
 import type { ServerStatusReport } from "../domain/server";
 
 export const TEST_ORG_ID = "org-test";
@@ -52,6 +57,9 @@ export class InMemoryServerRepo implements ServerRepository {
       id: input.id,
       name: input.name,
       address: input.address ?? "",
+      sshPort: input.sshPort ?? 22,
+      sshUser: input.sshUser ?? "root",
+      sshPrivateKey: input.sshPrivateKey ?? "",
       status: input.status,
       cpuCores: input.cpuCores ?? 0,
       memoryBytes: input.memoryBytes,
@@ -283,6 +291,50 @@ export class InMemoryRepository implements Repository {
     this.systemSetup = new InMemorySystemSetupRepo();
     this.orgs = new InMemoryOrgRepo();
     this.memberships = new InMemoryMembershipRepo();
+  }
+}
+
+export class FakeNodeCommandClient implements NodeCommandClientType {
+  deployLogs: NodeCommandLogEntry[] = [];
+  deployed: Array<{ serverId: string; appId: string; composeYaml: string }> =
+    [];
+  containerStates: ContainerState[] = [];
+  deployError?: Error;
+
+  async *deploy(
+    serverId: string,
+    appId: string,
+    composeYaml: string,
+  ): AsyncIterable<NodeCommandLogEntry> {
+    if (this.deployError) throw this.deployError;
+    this.deployed.push({ serverId, appId, composeYaml });
+    for (const entry of this.deployLogs) {
+      yield entry;
+    }
+  }
+
+  async restart(_serverId: string, _appId: string): Promise<void> {}
+  async stop(_serverId: string, _appId: string): Promise<void> {}
+  async remove(
+    _serverId: string,
+    _appId: string,
+    _volumes: boolean,
+  ): Promise<void> {}
+
+  async status(_serverId: string, _appId: string): Promise<ContainerState[]> {
+    return this.containerStates;
+  }
+
+  async logs(
+    _serverId: string,
+    _appId: string,
+    _lines: number,
+  ): Promise<NodeCommandLogEntry[]> {
+    return this.deployLogs;
+  }
+
+  async isReachable(_serverId: string): Promise<boolean> {
+    return true;
   }
 }
 

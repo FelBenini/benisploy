@@ -11,6 +11,8 @@ describe("registerServer", () => {
     const input: CreateServerInput = {
       name: "my-server",
       address: "192.168.1.100",
+      sshPort: 22,
+      sshUser: "root",
       cpuCores: 4,
       memoryBytes: 8_000_000_000,
       diskBytes: 100_000_000_000,
@@ -22,6 +24,10 @@ describe("registerServer", () => {
     expect(server.id).toBeDefined();
     expect(server.name).toBe("my-server");
     expect(server.address).toBe("192.168.1.100");
+    expect(server.sshPort).toBe(22);
+    expect(server.sshUser).toBe("root");
+    expect(server.sshPrivateKey).toBeDefined();
+    expect(server.sshPrivateKey).toContain("RSA PRIVATE KEY");
     expect(server.cpuCores).toBe(4);
     expect(server.memoryBytes).toBe(8_000_000_000);
     expect(server.diskBytes).toBe(100_000_000_000);
@@ -38,6 +44,8 @@ describe("registerServer", () => {
     const input: CreateServerInput = {
       name: "minimal-server",
       address: "10.0.0.1",
+      sshPort: 22,
+      sshUser: "root",
       cpuCores: 2,
       memoryBytes: 4_000_000_000,
       diskBytes: 50_000_000_000,
@@ -55,6 +63,8 @@ describe("registerServer", () => {
     const input: CreateServerInput = {
       name: "persist-test",
       address: "10.0.0.2",
+      sshPort: 22,
+      sshUser: "root",
       cpuCores: 8,
       memoryBytes: 16_000_000_000,
       diskBytes: 200_000_000_000,
@@ -74,6 +84,8 @@ describe("registerServer", () => {
     const input: CreateServerInput = {
       name: "org-specific",
       address: "10.0.0.3",
+      sshPort: 22,
+      sshUser: "root",
       cpuCores: 2,
       memoryBytes: 4_000_000_000,
       diskBytes: 50_000_000_000,

@@ -10,6 +10,18 @@ export const ServerSchema = z.object({
     .string()
     .min(1)
     .describe("IP or hostname the node agent is reachable at"),
+  sshPort: z
+    .number()
+    .int()
+    .positive()
+    .max(65535)
+    .default(22)
+    .describe("SSH port"),
+  sshUser: z.string().min(1).default("root").describe("SSH login user"),
+  sshPrivateKey: z
+    .string()
+    .min(1)
+    .describe("SSH private key PEM (encrypted at rest)"),
   status: ServerStatusSchema.default("offline"),
   cpuCores: z.number().int().positive().describe("Number of CPU cores"),
   memoryBytes: z.number().positive().describe("Total system memory in bytes"),
@@ -23,8 +35,6 @@ export const ServerSchema = z.object({
   updatedAt: z.string().datetime(),
 });
 
-export type Server = z.infer<typeof ServerSchema>;
-
 export const CreateServerInputSchema = ServerSchema.pick({
   name: true,
   address: true,
@@ -33,9 +43,19 @@ export const CreateServerInputSchema = ServerSchema.pick({
   diskBytes: true,
 }).extend({
   labels: z.record(z.string(), z.string()).optional(),
+  sshPort: z
+    .number()
+    .int()
+    .positive()
+    .max(65535)
+    .default(22)
+    .describe("SSH port"),
+  sshUser: z.string().min(1).default("root").describe("SSH login user"),
 });
 
 export type CreateServerInput = z.infer<typeof CreateServerInputSchema>;
+
+export type Server = z.infer<typeof ServerSchema>;
 
 export const ServerStatusReportSchema = z.object({
   cpuPercent: z
