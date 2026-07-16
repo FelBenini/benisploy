@@ -1,5 +1,6 @@
 import type { NodePgDatabase } from "drizzle-orm/node-postgres";
 import type { Repository } from "../../ports/repository";
+import type { FieldTransform } from "./servers";
 import * as schema from "../../db/schema";
 import { DrizzleServerRepository } from "./servers";
 import { DrizzleAppRepository } from "./apps";
@@ -22,8 +23,16 @@ export class DrizzleRepository implements Repository {
   orgs: DrizzleOrgRepository;
   memberships: DrizzleOrgMembershipRepository;
 
-  constructor(db: DrizzleDB) {
-    this.servers = new DrizzleServerRepository(db);
+  constructor(
+    db: DrizzleDB,
+    encryptPrivateKey?: FieldTransform,
+    decryptPrivateKey?: FieldTransform,
+  ) {
+    this.servers = new DrizzleServerRepository(
+      db,
+      encryptPrivateKey,
+      decryptPrivateKey,
+    );
     this.apps = new DrizzleAppRepository(db);
     this.deployments = new DrizzleDeploymentRepository(db);
     this.users = new DrizzleUserRepository(db);
