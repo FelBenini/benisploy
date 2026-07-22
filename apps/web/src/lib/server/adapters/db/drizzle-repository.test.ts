@@ -61,6 +61,8 @@ describe("DrizzleRepository integration", () => {
     const server = await registerServer(ORG, {
       name: "integration-server",
       address: "10.0.0.100",
+      sshPort: 22,
+      sshUser: "root",
       cpuCores: 4,
       memoryBytes: 8_000_000_000,
       diskBytes: 100_000_000_000,
@@ -87,6 +89,8 @@ describe("DrizzleRepository integration", () => {
     const server = await registerServer(ORG, {
       name: "deploy-target",
       address: "10.0.0.1",
+      sshPort: 22,
+      sshUser: "root",
       cpuCores: 2,
       memoryBytes: 4_000_000_000,
       diskBytes: 50_000_000_000,
@@ -123,6 +127,8 @@ describe("DrizzleRepository integration", () => {
     const server = await registerServer(ORG, {
       name: "get-target",
       address: "10.0.0.2",
+      sshPort: 22,
+      sshUser: "root",
       cpuCores: 2,
       memoryBytes: 4_000_000_000,
       diskBytes: 50_000_000_000,
@@ -154,6 +160,8 @@ describe("DrizzleRepository integration", () => {
     const serverA = await registerServer(ORG, {
       name: "list-srv-a",
       address: "10.0.0.3",
+      sshPort: 22,
+      sshUser: "root",
       cpuCores: 2,
       memoryBytes: 4_000_000_000,
       diskBytes: 50_000_000_000,
@@ -161,6 +169,8 @@ describe("DrizzleRepository integration", () => {
     const serverB = await registerServer(ORG, {
       name: "list-srv-b",
       address: "10.0.0.4",
+      sshPort: 22,
+      sshUser: "root",
       cpuCores: 2,
       memoryBytes: 4_000_000_000,
       diskBytes: 50_000_000_000,
@@ -187,6 +197,8 @@ describe("DrizzleRepository integration", () => {
     await registerServer("org-alpha", {
       name: "alpha-server",
       address: "10.0.0.1",
+      sshPort: 22,
+      sshUser: "root",
       cpuCores: 2,
       memoryBytes: 4_000_000_000,
       diskBytes: 50_000_000_000,

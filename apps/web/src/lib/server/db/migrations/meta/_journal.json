@@ -15,6 +15,13 @@
       "when": 1784052894036,
       "tag": "0001_rapid_william_stryker",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784237579311,
+      "tag": "0002_lumpy_rattler",
+      "breakpoints": true
     }
   ]
 }
