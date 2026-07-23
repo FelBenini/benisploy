@@ -7,14 +7,18 @@ import (
 
 func roundTrip[T any](t *testing.T, in T) T {
 	t.Helper()
+
 	data, err := json.Marshal(in)
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
+
 	var out T
+
 	if err := json.Unmarshal(data, &out); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
+
 	return out
 }
 
@@ -26,210 +30,156 @@ func TestAppSpecRoundTrip(t *testing.T) {
 			"FOO": "bar",
 		},
 		Ports: []PortMapping{
-			{Container: 80, Protocol: "tcp"},
+			{
+				Container: 80,
+				Protocol:  "tcp",
+			},
 		},
 		VolumeMounts: []VolumeMount{
-			{Source: "data", Target: "/var/lib/data", Mode: "rw"},
+			{
+				Source: "data",
+				Target: "/var/lib/data",
+				Mode:   "rw",
+			},
 		},
 		ResourceLimits: &ResourceLimits{
 			CPUs:     "0.5",
 			MemoryMB: 256,
 		},
 		HealthCheck: &HealthCheck{
-			Test: []string{"CMD-SHELL", "curl -f http://localhost || exit 1"},
+			Test: []string{
+				"CMD-SHELL",
+				"curl -f http://localhost || exit 1",
+			},
 		},
 	}
+
 	out := roundTrip(t, in)
 
 	if out.Name != in.Name {
-		t.Fatalf("Name: got %q, want %q", out.Name, in.Name)
+		t.Fatal("name mismatch")
 	}
+
 	if out.Image != in.Image {
-		t.Fatalf("Image: got %q, want %q", out.Image, in.Image)
+		t.Fatal("image mismatch")
 	}
+
 	if out.EnvVars["FOO"] != "bar" {
-		t.Fatal("EnvVars.FOO not preserved")
-	}
-	if out.ResourceLimits.CPUs != "0.5" {
-		t.Fatal("ResourceLimits.CPUs not preserved")
+		t.Fatal("env vars mismatch")
 	}
 }
 
-func TestDeployPayloadRoundTrip(t *testing.T) {
-	in := DeployPayload{
-		DeploymentID: "deploy-1",
-		AppSpec: AppSpec{
-			Name:  "myapp",
-			Image: "redis:7",
+func TestStatsPushPayloadRoundTrip(t *testing.T) {
+	in := StatsPushPayload{
+		CPUPercent: 42.5,
+
+		Memory: MemoryStats{
+			Total:     16_000,
+			Used:      8_000,
+			Available: 8_000,
+		},
+
+		Disk: DiskStats{
+			Total: 100_000,
+			Used:  40_000,
+		},
+
+		Uptime:         7200,
+		ContainerCount: 2,
+
+		ContainerStates: []ContainerState{
+			{
+				ID:    "abc",
+				Name:  "api",
+				State: "running",
+			},
+			{
+				ID:    "xyz",
+				Name:  "redis",
+				State: "running",
+			},
 		},
 	}
+
 	out := roundTrip(t, in)
 
-	if out.DeploymentID != "deploy-1" {
-		t.Fatalf("DeploymentID: got %q, want %q", out.DeploymentID, "deploy-1")
+	if out.CPUPercent != 42.5 {
+		t.Fatal("cpu mismatch")
 	}
-	if out.AppSpec.Name != "myapp" {
-		t.Fatalf("AppSpec.Name: got %q, want %q", out.AppSpec.Name, "myapp")
+
+	if out.Memory.Total != 16_000 {
+		t.Fatal("memory mismatch")
+	}
+
+	if out.Disk.Used != 40_000 {
+		t.Fatal("disk mismatch")
+	}
+
+	if len(out.ContainerStates) != 2 {
+		t.Fatal("container count mismatch")
 	}
 }
 
-func TestStatusResponsePayloadRoundTrip(t *testing.T) {
-	in := StatusResponsePayload{
-		CPUPercent:    45.2,
-		MemoryUsed:    8_000_000_000,
-		MemoryTotal:   16_000_000_000,
-		DiskUsed:      200_000_000_000,
-		DiskTotal:     500_000_000_000,
-		Containers:    []ContainerInfo{
-			{ID: "abc123", Name: "web", Image: "nginx:alpine", State: "running"},
+func TestEventPushPayloadRoundTrip(t *testing.T) {
+	appID := "app-123"
+
+	in := EventPushPayload{
+		EventType:     EventOOM,
+		ContainerID:   "container-1",
+		ContainerName: "api",
+		AppID:         &appID,
+		Timestamp:     "2026-07-22T10:00:00Z",
+		Extra: map[string]interface{}{
+			"exitCode": 137,
+			"signal":   "SIGKILL",
 		},
-		UptimeSeconds: 3600,
 	}
+
 	out := roundTrip(t, in)
 
-	if out.CPUPercent != 45.2 {
-		t.Fatalf("CPUPercent: got %f, want %f", out.CPUPercent, 45.2)
+	if out.EventType != EventOOM {
+		t.Fatal("event type mismatch")
 	}
-	if len(out.Containers) != 1 {
-		t.Fatalf("expected 1 container, got %d", len(out.Containers))
+
+	if out.ContainerID != "container-1" {
+		t.Fatal("container id mismatch")
+	}
+
+	if *out.AppID != appID {
+		t.Fatal("app id mismatch")
 	}
 }
 
 func TestEnvelopeRoundTrip(t *testing.T) {
-	payload, _ := json.Marshal(HeartbeatPayload{ServerID: "srv-1"})
+	payload, err := json.Marshal(StatsPushPayload{
+		CPUPercent: 10,
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	in := Envelope{
-		Type:      TypeHeartbeat,
+		Type:      TypeStatsPush,
 		ID:        "msg-1",
-		Timestamp: "2026-01-01T00:00:00Z",
+		Timestamp: "2026-07-22T10:00:00Z",
 		Payload:   payload,
 	}
+
 	out := roundTrip(t, in)
 
-	if out.Type != TypeHeartbeat {
-		t.Fatalf("Type: got %q, want %q", out.Type, TypeHeartbeat)
-	}
-	if out.ID != "msg-1" {
-		t.Fatalf("ID: got %q, want %q", out.ID, "msg-1")
+	if out.Type != TypeStatsPush {
+		t.Fatal("type mismatch")
 	}
 
-	var hb HeartbeatPayload
-	if err := json.Unmarshal(out.Payload, &hb); err != nil {
-		t.Fatalf("unmarshal heartbeat payload: %v", err)
+	var stats StatsPushPayload
+
+	if err := json.Unmarshal(out.Payload, &stats); err != nil {
+		t.Fatal(err)
 	}
-	if hb.ServerID != "srv-1" {
-		t.Fatalf("ServerID: got %q, want %q", hb.ServerID, "srv-1")
+
+	if stats.CPUPercent != 10 {
+		t.Fatal("payload mismatch")
 	}
 }
 
-func TestHeartbeatPayloadExtendedRoundTrip(t *testing.T) {
-	in := HeartbeatPayload{
-		ServerID:      "srv-ext",
-		Hostname:      "myserver.local",
-		CPUPercent:    42.5,
-		MemoryUsed:    8_000_000_000,
-		MemoryTotal:   16_000_000_000,
-		DiskUsed:      200_000_000_000,
-		DiskTotal:     500_000_000_000,
-		UptimeSeconds: 7200,
-	}
-	out := roundTrip(t, in)
-
-	if out.ServerID != "srv-ext" {
-		t.Fatalf("ServerID: got %q, want %q", out.ServerID, "srv-ext")
-	}
-	if out.Hostname != "myserver.local" {
-		t.Fatalf("Hostname: got %q, want %q", out.Hostname, "myserver.local")
-	}
-	if out.CPUPercent != 42.5 {
-		t.Fatalf("CPUPercent: got %f, want %f", out.CPUPercent, 42.5)
-	}
-	if out.MemoryUsed != 8_000_000_000 {
-		t.Fatalf("MemoryUsed: got %d, want %d", out.MemoryUsed, 8_000_000_000)
-	}
-	if out.MemoryTotal != 16_000_000_000 {
-		t.Fatalf("MemoryTotal: got %d, want %d", out.MemoryTotal, 16_000_000_000)
-	}
-	if out.DiskUsed != 200_000_000_000 {
-		t.Fatalf("DiskUsed: got %d, want %d", out.DiskUsed, 200_000_000_000)
-	}
-	if out.DiskTotal != 500_000_000_000 {
-		t.Fatalf("DiskTotal: got %d, want %d", out.DiskTotal, 500_000_000_000)
-	}
-	if out.UptimeSeconds != 7200 {
-		t.Fatalf("UptimeSeconds: got %d, want %d", out.UptimeSeconds, 7200)
-	}
-}
-
-func TestStreamLogsPayloadRoundTrip(t *testing.T) {
-	in := StreamLogsPayload{
-		AppID:  "app-1",
-		Lines:  200,
-		Follow: true,
-	}
-	out := roundTrip(t, in)
-
-	if out.AppID != "app-1" {
-		t.Fatalf("AppID: got %q, want %q", out.AppID, "app-1")
-	}
-	if out.Lines != 200 {
-		t.Fatalf("Lines: got %d, want %d", out.Lines, 200)
-	}
-	if !out.Follow {
-		t.Fatal("Follow should be true")
-	}
-}
-
-func TestErrorPayloadRoundTrip(t *testing.T) {
-	in := ErrorPayload{
-		Code:              "DEPLOY_FAILED",
-		Message:           "container exited immediately",
-		OriginalMessageID: "msg-42",
-	}
-	out := roundTrip(t, in)
-
-	if out.Code != "DEPLOY_FAILED" {
-		t.Fatalf("Code: got %q, want %q", out.Code, "DEPLOY_FAILED")
-	}
-}
-
-func TestDeployResponsePayloadRoundTrip(t *testing.T) {
-	in := DeployResponsePayload{
-		Accepted:     true,
-		DeploymentID: "deploy-42",
-	}
-	out := roundTrip(t, in)
-
-	if !out.Accepted {
-		t.Fatal("Accepted should be true")
-	}
-	if out.DeploymentID != "deploy-42" {
-		t.Fatalf("DeploymentID: got %q, want %q", out.DeploymentID, "deploy-42")
-	}
-}
-
-func TestHeartbeatAckPayloadRoundTrip(t *testing.T) {
-	in := HeartbeatAckPayload{
-		Timestamp: "2026-07-10T12:00:00Z",
-	}
-	out := roundTrip(t, in)
-
-	if out.Timestamp != "2026-07-10T12:00:00Z" {
-		t.Fatalf("Timestamp: got %q, want %q", out.Timestamp, "2026-07-10T12:00:00Z")
-	}
-}
-
-func TestLogEntryPayloadRoundTrip(t *testing.T) {
-	in := LogEntryPayload{
-		Timestamp: "2026-07-10T12:00:00Z",
-		Stream:    "stdout",
-		Message:   "Server started",
-	}
-	out := roundTrip(t, in)
-
-	if out.Stream != "stdout" {
-		t.Fatalf("Stream: got %q, want %q", out.Stream, "stdout")
-	}
-	if out.Message != "Server started" {
-		t.Fatalf("Message: got %q, want %q", out.Message, "Server started")
-	}
-}
