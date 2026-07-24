@@ -1,33 +1,29 @@
-// Package protocol defines the WebSocket message types shared
-// between the control plane (TypeScript/Zod) and the node agent (Go).
+// Package protocol defines the shared wire protocol between the control plane
+// and the node monitor.
 //
-// Every message is wrapped in an Envelope with a string-encoded
-// JSON payload that the receiver dispatches based on Type.
+// The TypeScript implementation (packages/agent-protocol/src/index.ts)
+// remains the source of truth. This package mirrors the JSON schema for Go
+// producers.
 //
-// Wire format: JSON. Field tags must stay in sync with the Zod
-// schemas in packages/agent-protocol/src/index.ts.
+// NOTE:
+// The node monitor no longer consumes command messages. This package now
+// contains only the shared envelope, AppSpec (still used elsewhere), and
+// telemetry push payloads.
 package protocol
 
 import "encoding/json"
 
-// ── Envelope ────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Envelope
+// ─────────────────────────────────────────────────────────────────────────────
 
-// MessageType enumerates all valid message discriminators.
 type MessageType string
 
 const (
-	TypeDeploy        MessageType = "deploy"
-	TypeDeployResp    MessageType = "deploy_response"
-	TypeGetStatus     MessageType = "get_status"
-	TypeStatusResp    MessageType = "status_response"
-	TypeStreamLogs    MessageType = "stream_logs"
-	TypeLogEntry      MessageType = "log_entry"
-	TypeHeartbeat     MessageType = "heartbeat"
-	TypeHeartbeatAck  MessageType = "heartbeat_ack"
-	TypeError         MessageType = "error"
+	TypeStatsPush MessageType = "stats_push"
+	TypeEventPush MessageType = "event_push"
 )
 
-// Envelope is the outer wrapper for every WebSocket message.
 type Envelope struct {
 	Type      MessageType     `json:"type"`
 	ID        string          `json:"id"`
@@ -35,7 +31,9 @@ type Envelope struct {
 	Payload   json.RawMessage `json:"payload"`
 }
 
-// ── AppSpec (wire format) ────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// AppSpec (shared wire format)
+// ─────────────────────────────────────────────────────────────────────────────
 
 type HealthCheck struct {
 	Test        []string `json:"test"`
@@ -62,92 +60,62 @@ type PortMapping struct {
 }
 
 type AppSpec struct {
-	Name           string            `json:"name"`
-	Image          string            `json:"image,omitempty"`
-	BuildContext   string            `json:"buildContext,omitempty"`
-	ComposeOverrides string          `json:"composeOverrides,omitempty"`
-	EnvVars        map[string]string `json:"envVars"`
-	Ports          []PortMapping     `json:"ports"`
-	VolumeMounts   []VolumeMount     `json:"volumeMounts"`
-	ResourceLimits *ResourceLimits   `json:"resourceLimits,omitempty"`
-	HealthCheck    *HealthCheck      `json:"healthCheck,omitempty"`
+	Name             string            `json:"name"`
+	Image            string            `json:"image,omitempty"`
+	BuildContext     string            `json:"buildContext,omitempty"`
+	ComposeOverrides string            `json:"composeOverrides,omitempty"`
+	EnvVars          map[string]string `json:"envVars"`
+	Ports            []PortMapping     `json:"ports"`
+	VolumeMounts     []VolumeMount     `json:"volumeMounts"`
+	ResourceLimits   *ResourceLimits   `json:"resourceLimits,omitempty"`
+	HealthCheck      *HealthCheck      `json:"healthCheck,omitempty"`
 }
 
-// ── deploy / deploy_response ────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Telemetry
+// ─────────────────────────────────────────────────────────────────────────────
 
-type DeployPayload struct {
-	DeploymentID   string  `json:"deploymentId"`
-	AppSpec        AppSpec `json:"appSpec"`
-	ComposeContent string  `json:"composeContent,omitempty"`
+type MemoryStats struct {
+	Total     uint64 `json:"total"`
+	Used      uint64 `json:"used"`
+	Available uint64 `json:"available"`
 }
 
-type DeployResponsePayload struct {
-	Accepted     bool   `json:"accepted"`
-	DeploymentID string `json:"deploymentId"`
+type DiskStats struct {
+	Total uint64 `json:"total"`
+	Used  uint64 `json:"used"`
 }
 
-// ── get_status / status_response ────────────────────────────────────────
-
-type ContainerInfo struct {
-	ID           string `json:"id"`
-	Name         string `json:"name"`
-	Image        string `json:"image"`
-	State        string `json:"state"`
-	PortMappings []struct {
-		Host      int `json:"host"`
-		Container int `json:"container"`
-	} `json:"portMappings"`
+type ContainerState struct {
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	State string `json:"state"`
 }
 
-type StatusResponsePayload struct {
-	CPUPercent    float64         `json:"cpuPercent"`
-	MemoryUsed    int64           `json:"memoryUsed"`
-	MemoryTotal   int64           `json:"memoryTotal"`
-	DiskUsed      int64           `json:"diskUsed"`
-	DiskTotal     int64           `json:"diskTotal"`
-	Containers    []ContainerInfo `json:"containers"`
-	UptimeSeconds int64           `json:"uptimeSeconds"`
+type StatsPushPayload struct {
+	CPUPercent      float64          `json:"cpuPercent"`
+	Memory          MemoryStats      `json:"memory"`
+	Disk            DiskStats        `json:"disk"`
+	Uptime          uint64           `json:"uptime"`
+	ContainerCount  int              `json:"containerCount"`
+	ContainerStates []ContainerState `json:"containerStates"`
 }
 
-// ── stream_logs / log_entry ─────────────────────────────────────────────
+type EventType string
 
-type StreamLogsPayload struct {
-	AppID  string `json:"appId"`
-	Lines  int    `json:"lines"`
-	Follow bool   `json:"follow"`
+const (
+	EventDie         EventType = "die"
+	EventOOM         EventType = "oom"
+	EventUnhealthy   EventType = "unhealthy"
+	EventRestartLoop EventType = "restart_loop"
+)
+
+type EventPushPayload struct {
+	EventType     EventType              `json:"eventType"`
+	ContainerID   string                 `json:"containerId"`
+	ContainerName string                 `json:"containerName"`
+	AppID         *string                `json:"appId,omitempty"`
+	Timestamp     string                 `json:"timestamp"`
+	Extra         map[string]interface{} `json:"extra"`
 }
 
-type LogEntryPayload struct {
-	Timestamp    string `json:"timestamp"`
-	Stream       string `json:"stream"`
-	Message      string `json:"message"`
-	DeploymentID string `json:"deploymentId,omitempty"`
-}
-
-// ── heartbeat / heartbeat_ack ───────────────────────────────────────────
-
-// HeartbeatPayload is sent periodically by the node agent to report
-// liveness and basic host facts. The control plane uses this to flip
-// the server status to "online" and cache the metrics for get_server_status.
-type HeartbeatPayload struct {
-	ServerID      string  `json:"serverId"`
-	Hostname      string  `json:"hostname"`
-	CPUPercent    float64 `json:"cpuPercent"`
-	MemoryUsed    int64   `json:"memoryUsed"`
-	MemoryTotal   int64   `json:"memoryTotal"`
-	DiskUsed      int64   `json:"diskUsed"`
-	DiskTotal     int64   `json:"diskTotal"`
-	UptimeSeconds int64   `json:"uptimeSeconds"`
-}
-
-type HeartbeatAckPayload struct {
-	Timestamp string `json:"timestamp"`
-}
-
-// ── error ───────────────────────────────────────────────────────────────
-
-type ErrorPayload struct {
-	Code              string `json:"code"`
-	Message           string `json:"message"`
-	OriginalMessageID string `json:"originalMessageId"`
-}

@@ -52,6 +52,8 @@ export const MessageTypeSchema = z.enum([
   "log_entry",
   "heartbeat",
   "heartbeat_ack",
+  "stats_push",
+  "event_push",
   "error",
 ]);
 
@@ -155,6 +157,80 @@ export const HeartbeatAckSchema = MessageEnvelopeSchema.extend({
   }),
 });
 
+// ── telemetry // stats ─────────────────────────────────────────────────────────────────
+
+export const MemoryStatsSchema = z.object({
+  total: z.number().nonnegative(),
+  used: z.number().nonnegative(),
+  available: z.number().nonnegative(),
+});
+
+export const DiskStatsSchema = z.object({
+  total: z.number().nonnegative(),
+  used: z.number().nonnegative(),
+});
+
+const ContainerRuntimeStateSchema = z.enum([
+  "created",
+  "running",
+  "paused",
+  "restarting",
+  "removing",
+  "exited",
+  "dead",
+]);
+
+export const ContainerStateSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  state: ContainerRuntimeStateSchema,
+});
+
+export const StatsPushPayloadSchema = z.object({
+  cpuPercent: z.number().min(0),
+
+  memory: MemoryStatsSchema,
+
+  disk: DiskStatsSchema,
+
+  uptime: z.number().nonnegative(),
+
+  containerCount: z.number().int().nonnegative(),
+
+  containerStates: z.array(ContainerStateSchema),
+});
+
+export const EventTypeSchema = z.enum([
+  "die",
+  "oom",
+  "unhealthy",
+  "restart_loop",
+]);
+
+export const EventPushPayloadSchema = z.object({
+  eventType: EventTypeSchema,
+
+  containerId: z.string(),
+
+  containerName: z.string(),
+
+  appId: z.string().optional(),
+
+  timestamp: z.string().datetime(),
+
+  extra: z.record(z.string(), z.unknown()).default({}),
+});
+
+export const StatsPushSchema = MessageEnvelopeSchema.extend({
+  type: z.literal("stats_push"),
+  payload: StatsPushPayloadSchema,
+});
+
+export const EventPushSchema = MessageEnvelopeSchema.extend({
+  type: z.literal("event_push"),
+  payload: EventPushPayloadSchema,
+});
+
 // ── error ─────────────────────────────────────────────────────────────────
 
 export const ErrorSchema = MessageEnvelopeSchema.extend({
@@ -177,7 +253,19 @@ export const AnyMessageSchema = z.discriminatedUnion("type", [
   LogEntrySchema,
   HeartbeatSchema,
   HeartbeatAckSchema,
+  StatsPushSchema,
+  EventPushSchema,
   ErrorSchema,
 ]);
 
 export type AnyMessage = z.infer<typeof AnyMessageSchema>;
+
+export type MemoryStats = z.infer<typeof MemoryStatsSchema>;
+export type DiskStats = z.infer<typeof DiskStatsSchema>;
+export type ContainerState = z.infer<typeof ContainerStateSchema>;
+
+export type StatsPushPayload = z.infer<typeof StatsPushPayloadSchema>;
+export type EventPushPayload = z.infer<typeof EventPushPayloadSchema>;
+
+export type StatsPushMessage = z.infer<typeof StatsPushSchema>;
+export type EventPushMessage = z.infer<typeof EventPushSchema>;
